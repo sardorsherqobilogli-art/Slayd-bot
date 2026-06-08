@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Deutsch Booster - Telegram Bot
+KIWI - Telegram Bot
 python-telegram-bot v20+
 Railway: BOT_TOKEN environment variable kerak
 """
