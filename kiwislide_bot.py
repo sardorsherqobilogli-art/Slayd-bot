@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Deutsch Booster - Telegram Bot
+Deutsch Booster - Telegram Bot (Ovozli suhbat bilan)
 python-telegram-bot v20+
-Railway: BOT_TOKEN environment variable kerak
 """
 
 import logging
 import os
 import random
 import datetime
-import json
 import tempfile
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
@@ -46,14 +44,17 @@ logger = logging.getLogger(__name__)
     LEVEL_SELECT,
     A1_MENU, A2_MENU, B1_MENU, B2_MENU, C1_MENU,
     BOOK_MENU,
-    LEKTION_PAGE,
     TRANSLATOR,
     QUIZ_STATE,
     POMODORO_STATE,
     UZB_DEU_INPUT,
     DEU_UZB_INPUT,
     VOICE_CHAT,
-) = range(15)
+    ERSP_LEVEL,
+    ERSP_TIME,
+    ERSP_WORD_TEST,
+    ERSP_SPEAKING,
+) = range(18)
 
 # ==================== CALLBACKS ====================
 class CB:
@@ -70,7 +71,6 @@ class CB:
     TRANSLATOR    = "translator"
     UZB_DEU       = "uzb_deu"
     DEU_UZB       = "deu_uzb"
-    TRANSLATOR_AGAIN = "translator_again"
     HELP          = "help"
     QUIZ_KNOW     = "quiz_know"
     QUIZ_DONTKNOW = "quiz_dontknow"
@@ -86,19 +86,15 @@ BOOK_LEKTIONS = {
     "a1_motive":   (1, 8),
     "a1_schritte": (1, 14),
     "a1_menschen": (1, 24),
-
     "a2_motive":   (9, 18),
     "a2_schritte": (1, 14),
     "a2_menschen": (1, 24),
-
     "b1_motive":   (19, 30),
     "b1_schritte": (1, 14),
     "b1_menschen": (1, 24),
-
     "b2_sicher":      (1, 12),
     "b2_kompassdaf":  (1, 10),
     "b2_aspekte":     (1, 10),
-
     "c1_sicher":      (1, 12),
     "c1_kompassdaf":  (1, 10),
     "c1_aspekte":     (1, 10),
@@ -125,16 +121,14 @@ LEVEL_LABELS = {
     "a1": "🟢 A1 \\- Beginner",
     "a2": "🟢 A2 \\- Elementary",
     "b1": "🟡 B1 \\- Intermediate",
-    "b2": "🟡 B2 \\- Upper\\-Intermediate",
+    "b2": "🟡 B2 \\- Upper\-Intermediate",
     "c1": "🔴 C1 \\- Advanced",
 }
 
 
 # ==================== A1 MOTIVE LUGATLARI ====================
-
 A1_MOTIVE_LEKTIONS = {
     1: r"""🇩🇪 *A1 • MOTIVE • Lektion 1*
-
 🔸 der Buchstabe \- harf
 🔹 das Wiedersehen \- ko'rishguncha
 🔸 buchstabieren \- harflab aytmoq
@@ -273,7 +267,6 @@ A1_MOTIVE_LEKTIONS = {
 🔹 kein \- hech qanday""",
 
     2: r"""🇩🇪 *A1 • MOTIVE • Lektion 2*
-
 🔸 das Ausland \- chet el
 🔹 der/die Bekannte \- tanish
 🔸 die E\-Mail \- elektron pochta
@@ -324,7 +317,6 @@ A1_MOTIVE_LEKTIONS = {
 🔹 wie bitte \- uzr, nima dedingiz?""",
 
     3: r"""🇩🇪 *A1 • MOTIVE • Lektion 3*
-
 🔸 der Beruf \- kasb
 🔹 der Bruder \- aka, uka
 🔸 die Eltern \- ota\-ona
@@ -370,7 +362,6 @@ A1_MOTIVE_LEKTIONS = {
 🔸 wie viele \- nechta?""",
 
     4: r"""🇩🇪 *A1 • MOTIVE • Lektion 4*
-
 🔸 die Arbeit \- ish
 🔹 der Arzt \- shifokor erkak
 🔸 die Ärztin \- shifokor ayol
@@ -429,7 +420,6 @@ A1_MOTIVE_LEKTIONS = {
 🔹 selbstständig \- mustaqil""",
 
     5: r"""🇩🇪 *A1 • MOTIVE • Lektion 5*
-
 🔸 die Kommunikation \- kommunikatsiya
 🔹 der Konsum \- iste'mol
 🔸 das Lebensmittel \- oziq\-ovqat
@@ -514,7 +504,6 @@ A1_MOTIVE_LEKTIONS = {
 🔹 zusammen \- birga""",
 
     6: r"""🇩🇪 *A1 • MOTIVE • Lektion 6*
-
 🔸 der Alltag \- kundalik hayot
 🔹 das Büro \- ofis
 🔸 die Freizeit \- bo'sh vaqt
@@ -582,7 +571,6 @@ A1_MOTIVE_LEKTIONS = {
 🔸 laut \- baland ovozli""",
 
     7: r"""🇩🇪 *A1 • MOTIVE • Lektion 7*
-
 🔸 einladen \- taklif qilmoq
 🔹 die Ampel \- svetofor
 🔸 die Apotheke \- dorixona
@@ -664,7 +652,6 @@ A1_MOTIVE_LEKTIONS = {
 🔸 zwischen \- orasida""",
 
     8: r"""🇩🇪 *A1 • MOTIVE • Lektion 8*
-
 🔸 der Einwohner \- aholi
 🔹 der Fluss \- daryo
 🔸 die Insel \- orol
@@ -845,41 +832,34 @@ A1_MOTIVE_LEKTIONS = {
 🔹 ab \- dan boshlab""",
 }
 
-# Boshqa kitoblar uchun placeholder — keyinchalik to'ldirish mumkin
+
 def get_lektion_text(level: str, book: str, n: int) -> str:
-    """Lektion matnini qaytaradi"""
     if level == "a1" and book == "motive":
         text = A1_MOTIVE_LEKTIONS.get(n)
         if text:
             return text
-
-    # Boshqa barcha lektion va kitoblar uchun
     label = BOOK_LABELS[book]
     level_label = LEVEL_LABELS[level]
     return (
-        f"{level_label} \\| {label}\n"
+        f"{level_label} \| {label}\n"
         f"📖 *Lektion {n}*\n\n"
-        "⏳ Bu lektion materiallari tez orada qo'shiladi\\!\n\n"
-        "📌 Hozircha A1 Motive lektsiyalari to'liq mavjud\\."
+        "⏳ Bu lektion materiallari tez orada qo'shiladi\!\n\n"
+        "📌 Hozircha A1 Motive lektsiyalari to'liq mavjud\."
     )
 
 
 def parse_words(level: str, book: str, n: int) -> list:
-    """Lug'at matnidan (german, uzbek) juftliklarini oladi"""
     if level == "a1" and book == "motive":
         raw = A1_MOTIVE_LEKTIONS.get(n, "")
     else:
         return []
-
     words = []
     for line in raw.split("\n"):
         line = line.strip()
-        # Emoji va backslash larni tozalash
         for emoji in ["🔸", "🔹"]:
             line = line.replace(emoji, "").strip()
-        # "der Buchstabe \- harf" shaklini ajratamiz
-        if " \\- " in line:
-            parts = line.split(" \\- ", 1)
+        if " \- " in line:
+            parts = line.split(" \- ", 1)
             if len(parts) == 2:
                 german = parts[0].strip()
                 uzbek = parts[1].strip()
@@ -888,7 +868,7 @@ def parse_words(level: str, book: str, n: int) -> list:
     return words
 
 
-# ==================== QUIZ HELPERS ====================
+# ==================== QUIZ ====================
 
 def get_quiz_state(context) -> dict:
     return context.user_data.get("quiz", {})
@@ -908,36 +888,28 @@ def quiz_card_keyboard():
 def quiz_result_keyboard(level: str, book: str, n: int, has_wrong: bool):
     rows = []
     if has_wrong:
-        rows.append([InlineKeyboardButton(
-            "🔁 Bilmaganlarni takrorlash", callback_data=CB.QUIZ_REPEAT
-        )])
-    rows.append([InlineKeyboardButton(
-        "↩️ Lektsiyaga qaytish",
-        callback_data=f"lekt_{level}_{book}_{n}"
-    )])
+        rows.append([InlineKeyboardButton("🔁 Bilmaganlarni takrorlash", callback_data=CB.QUIZ_REPEAT)])
+    rows.append([InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")])
     rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
     return InlineKeyboardMarkup(rows)
 
 
 async def show_quiz_card(query, context):
-    """Navbatdagi flashcard kartani ko'rsatadi"""
     q = get_quiz_state(context)
     words = q["words"]
     idx = q["index"]
 
     if idx >= len(words):
-        # Test tugadi
         wrong = q["wrong"]
         total = q["total"]
         correct = total - len(wrong)
-
         level = q["level"]
         book  = q["book"]
         n     = q["n"]
 
         def esc_result(s):
             for ch in r"\_*[]()~`>#+-=|{}.!":
-                s = s.replace(ch, f"\\{ch}")
+                s = s.replace(ch, f"\{ch}")
             return s
 
         wrong_text = ""
@@ -946,68 +918,47 @@ async def show_quiz_card(query, context):
             wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
 
         text = (
-            f"🏁 *Test tugadi\\!*\n\n"
+            f"🏁 *Test tugadi\!*\n\n"
             f"✅ Bildim: {correct}/{total}\n"
             f"❌ Bilmadim: {len(wrong)}/{total}"
             + wrong_text
         )
-        await query.edit_message_text(
-            text,
-            parse_mode="MarkdownV2",
-            reply_markup=quiz_result_keyboard(level, book, n, bool(wrong))
-        )
+        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=quiz_result_keyboard(level, book, n, bool(wrong)))
         return QUIZ_STATE
 
     german, uzbek = words[idx]
     total = q["total"]
-    # MarkdownV2 uchun xavfli belgilarni escape qilamiz
     def esc(s):
         for ch in r"\_*[]()~`>#+-=|{}.!":
-            s = s.replace(ch, f"\\{ch}")
+            s = s.replace(ch, f"\{ch}")
         return s
 
     text = (
-        f"🧠 *Yodlash testi* \\— {idx+1}/{total}\n\n"
+        f"🧠 *Yodlash testi* \— {idx+1}/{total}\n\n"
         f"🇩🇪 *{esc(german)}*\n\n"
         f"O'zbekcha tarjimasi qanday?"
     )
-    await query.edit_message_text(
-        text,
-        parse_mode="MarkdownV2",
-        reply_markup=quiz_card_keyboard()
-    )
+    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=quiz_card_keyboard())
     return QUIZ_STATE
 
 
 async def quiz_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """quiz_start_{level}_{book}_{n} callback"""
     query = update.callback_query
     await query.answer()
     parts = query.data.split("_")
-    # quiz_start_a1_motive_1 → ['quiz','start','a1','motive','1']
     level = parts[2]
     n     = int(parts[-1])
     book  = "_".join(parts[3:-1])
 
     words = parse_words(level, book, n)
     if not words:
-        await query.edit_message_text(
-            "⏳ Bu lektion uchun test hali mavjud emas\\.",
-            parse_mode="MarkdownV2",
-            reply_markup=back_to_main_keyboard()
-        )
+        await query.edit_message_text("⏳ Bu lektion uchun test hali mavjud emas\.", parse_mode="MarkdownV2", reply_markup=back_to_main_keyboard())
         return BOOK_MENU
 
     random.shuffle(words)
-
     set_quiz_state(context, {
-        "words": words,
-        "index": 0,
-        "wrong": [],
-        "total": len(words),
-        "level": level,
-        "book": book,
-        "n": n,
+        "words": words, "index": 0, "wrong": [], "total": len(words),
+        "level": level, "book": book, "n": n,
     })
     return await show_quiz_card(query, context)
 
@@ -1026,12 +977,11 @@ async def quiz_dontknow_handler(update: Update, context: ContextTypes.DEFAULT_TY
     q = get_quiz_state(context)
     words = q["words"]
     idx = q["index"]
-    # Javobni ko'rsatamiz
     german, uzbek = words[idx]
 
     def esc(s):
         for ch in r"\_*[]()~`>#+-=|{}.!":
-            s = s.replace(ch, f"\\{ch}")
+            s = s.replace(ch, f"\{ch}")
         return s
 
     await query.answer(f"❌ {uzbek}", show_alert=True)
@@ -1042,22 +992,14 @@ async def quiz_dontknow_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
 
 async def quiz_repeat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Bilmaganlarni qayta boshlash"""
     query = update.callback_query
     await query.answer()
     q = get_quiz_state(context)
     wrong = q["wrong"]
-
     random.shuffle(wrong)
-
     set_quiz_state(context, {
-        "words": wrong,
-        "index": 0,
-        "wrong": [],
-        "total": len(wrong),
-        "level": q["level"],
-        "book":  q["book"],
-        "n":     q["n"],
+        "words": wrong, "index": 0, "wrong": [], "total": len(wrong),
+        "level": q["level"], "book": q["book"], "n": q["n"],
     })
     return await show_quiz_card(query, context)
 
@@ -1065,7 +1007,6 @@ async def quiz_repeat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ==================== POMODORO ====================
 
 async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """pomodoro_start_{level}_{book}_{n}"""
     query = update.callback_query
     await query.answer()
     parts = query.data.split("_")
@@ -1075,27 +1016,16 @@ async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_T
 
     end_time = datetime.datetime.now() + datetime.timedelta(minutes=25)
     end_str  = end_time.strftime("%H:%M")
-
-    context.user_data["pomodoro"] = {
-        "level": level, "book": book, "n": n, "end": end_str
-    }
+    context.user_data["pomodoro"] = {"level": level, "book": book, "n": n, "end": end_str}
 
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("⏹ To'xtatish", callback_data=CB.POMODORO_STOP)],
-        [InlineKeyboardButton(
-            "↩️ Lektsiyaga qaytish",
-            callback_data=f"lekt_{level}_{book}_{n}"
-        )],
+        [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
     ])
 
     await query.edit_message_text(
-        f"🍅 *Pomodoro boshlandi\\!*\n\n"
-        f"⏱ 25 daqiqa o'qish vaqti\n"
-        f"🏁 Tugash: *{end_str}*\n\n"
-        f"Diqqatni jamlang va o'rganing\\! 💪\n"
-        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing\\.",
-        parse_mode="MarkdownV2",
-        reply_markup=keyboard
+        f"🍅 *Pomodoro boshlandi\!*\n\n⏱ 25 daqiqa o'qish vaqti\n🏁 Tugash: *{end_str}*\n\nDiqqatni jamlang va o'rganing\! 💪",
+        parse_mode="MarkdownV2", reply_markup=keyboard
     )
     return POMODORO_STATE
 
@@ -1104,24 +1034,15 @@ async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     p = context.user_data.get("pomodoro", {})
-
     level = p.get("level", "a1")
     book  = p.get("book", "motive")
     n     = p.get("n", 1)
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "↩️ Lektsiyaga qaytish",
-            callback_data=f"lekt_{level}_{book}_{n}"
-        )],
+        [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
         [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
     ])
-
-    await query.edit_message_text(
-        "⏹ *Pomodoro to'xtatildi*\n\nYaxshi harakat\\! Davom eting 💪",
-        parse_mode="MarkdownV2",
-        reply_markup=keyboard
-    )
+    await query.edit_message_text("⏹ *Pomodoro to'xtatildi*\n\nYaxshi harakat\! Davom eting 💪", parse_mode="MarkdownV2", reply_markup=keyboard)
     return MAIN_MENU
 
 
@@ -1138,7 +1059,7 @@ def main_menu_keyboard():
             InlineKeyboardButton("📕 C1 Vorbereitung", callback_data=CB.C1_PREP),
             InlineKeyboardButton("🌐 Tarjimon",         callback_data=CB.TRANSLATOR),
         ],
-        [InlineKeyboardButton("🎙️ Ovozli suhbat (AI)", callback_data=CB.VOICE_CHAT)],
+        [InlineKeyboardButton("🗣️ Erkin Sprechen", callback_data=CB.VOICE_CHAT)],
         [InlineKeyboardButton("ℹ️ Yordam", callback_data=CB.HELP)],
     ])
 
@@ -1162,10 +1083,7 @@ def books_keyboard(level: str):
     books = LEVEL_BOOKS[level]
     rows = []
     for book in books:
-        rows.append([InlineKeyboardButton(
-            BOOK_LABELS[book],
-            callback_data=f"book_{level}_{book}"
-        )])
+        rows.append([InlineKeyboardButton(BOOK_LABELS[book], callback_data=f"book_{level}_{book}")])
     rows.append([InlineKeyboardButton("↩️ Darajaga qaytish", callback_data=CB.LEVEL_SELECT)])
     rows.append([InlineKeyboardButton("🏠 Asosiy menu",      callback_data=CB.MAIN_MENU)])
     return InlineKeyboardMarkup(rows)
@@ -1175,31 +1093,18 @@ def lektions_keyboard(level: str, book: str):
     key = f"{level}_{book}"
     start, end = BOOK_LEKTIONS[key]
     nums = list(range(start, end + 1))
-
     rows = []
     for i in range(0, len(nums), 2):
         pair = nums[i:i+2]
-        row = [
-            InlineKeyboardButton(
-                f"Lektion {n}",
-                callback_data=f"lekt_{level}_{book}_{n}"
-            )
-            for n in pair
-        ]
+        row = [InlineKeyboardButton(f"Lektion {n}", callback_data=f"lekt_{level}_{book}_{n}") for n in pair]
         rows.append(row)
-
-    rows.append([InlineKeyboardButton(
-        "↩️ Kitobga qaytish",
-        callback_data=f"back_book_{level}"
-    )])
+    rows.append([InlineKeyboardButton("↩️ Kitobga qaytish", callback_data=f"back_book_{level}")])
     rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
     return InlineKeyboardMarkup(rows)
 
 
 def back_to_main_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)]
-    ])
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)]])
 
 
 def translator_keyboard():
@@ -1216,43 +1121,28 @@ def translator_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = (
-        "🎉 *Sprechen mit Spaß\\! Willkommen\\!* 🇩🇪\n\n"
-        "Siz oddiy botga emas, nemis tilini *raketa tezligida* o'rgatuvchi shaxsiy murabbiyingiz safiga qo'shildingiz\\! 🚀\n\n"
+        "🎉 *Sprechen mit Spaß\! Willkommen\!* 🇩🇪\n\n"
+        "Siz oddiy botga emas, nemis tilini *raketa tezligida* o'rgatuvchi shaxsiy murabbiyingiz safiga qo'shildingiz\! 🚀\n\n"
         "✨ *Bu yerda sizni nimalar kutmoqda:*\n"
-        "• Har kuni atigi 15 daqiqada yangi daraja\\! 🔥\n"
-        "• Miyani charchatmaydigan intellektual Quiz testlar\\! 🧠\n"
-        "• Fokusni 100% ga oshiruvchi Pomodoro taymer\\! 🍅\n\n"
-        "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring\\! 👇"
+        "• Har kuni atigi 15 daqiqada yangi daraja\! 🔥\n"
+        "• Miyani charchatmaydigan intellektual Quiz testlar\! 🧠\n"
+        "• Fokusni 100% ga oshiruvchi Pomodoro taymer\! 🍅\n"
+        "• 🗣️ Erkin Sprechen - AI bilan ovozli suhbat\! 🎙️\n\n"
+        "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring\! 👇"
     )
     if update.message:
-        await update.message.reply_text(
-            text,
-            parse_mode="MarkdownV2",
-            reply_markup=main_menu_keyboard(),
-        )
-        # Pastki doimiy menyu tugmasini o'rnat (alohida xabar sifatida)
-        await update.message.reply_text(
-            "👇 Pastdagi tugmadan foydalaning:",
-            reply_markup=REPLY_KEYBOARD,
-        )
+        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+        await update.message.reply_text("👇 Pastdagi tugmadan foydalaning:", reply_markup=REPLY_KEYBOARD)
     elif update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(
-            text,
-            parse_mode="MarkdownV2",
-            reply_markup=main_menu_keyboard(),
-        )
+        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
     return MAIN_MENU
 
 
 async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(
-        "🏠 *Asosiy Menu*\n\nBo'limni tanlang:",
-        parse_mode="MarkdownV2",
-        reply_markup=main_menu_keyboard(),
-    )
+    await query.edit_message_text("🏠 *Asosiy Menu*\n\nBo'limni tanlang:", parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
     return MAIN_MENU
 
 
@@ -1261,22 +1151,15 @@ async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.answer()
     await query.edit_message_text(
         "📚 *Daraja tanlash*\n\nO'z darajangizni tanlang:\n"
-        "🟢 A1\\-A2: Boshlang'ich\n"
-        "🟡 B1\\-B2: O'rta\n"
-        "🔴 C1: Yuqori",
-        parse_mode="MarkdownV2",
-        reply_markup=level_select_keyboard(),
+        "🟢 A1\-A2: Boshlang'ich\n🟡 B1\-B2: O'rta\n🔴 C1: Yuqori",
+        parse_mode="MarkdownV2", reply_markup=level_select_keyboard(),
     )
     return LEVEL_SELECT
 
 
 async def _show_books(query, level: str):
     label = LEVEL_LABELS[level]
-    await query.edit_message_text(
-        f"{label}\n\nKitob tanlang:",
-        parse_mode="MarkdownV2",
-        reply_markup=books_keyboard(level),
-    )
+    await query.edit_message_text(f"{label}\n\nKitob tanlang:", parse_mode="MarkdownV2", reply_markup=books_keyboard(level))
     state_map = {"a1": A1_MENU, "a2": A2_MENU, "b1": B1_MENU, "b2": B2_MENU, "c1": C1_MENU}
     return state_map[level]
 
@@ -1326,16 +1209,13 @@ async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     _, level, book = query.data.split("_", 2)
-
     key = f"{level}_{book}"
     start, end = BOOK_LEKTIONS[key]
     label = BOOK_LABELS[book]
     level_label = LEVEL_LABELS[level]
-
     await query.edit_message_text(
-        f"{level_label} \\| {label}\n\nLektion tanlang \\({start}\\-{end}\\):",
-        parse_mode="MarkdownV2",
-        reply_markup=lektions_keyboard(level, book),
+        f"{level_label} \| {label}\n\nLektion tanlang \({start}\-{end}\):",
+        parse_mode="MarkdownV2", reply_markup=lektions_keyboard(level, book),
     )
     return BOOK_MENU
 
@@ -1348,40 +1228,28 @@ async def back_book_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 
 async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """lekt_{level}_{book}_{n} callback — haqiqiy lug'atni ko'rsatadi"""
     query = update.callback_query
     await query.answer()
     parts = query.data.split("_")
-    # lekt_a1_motive_3  → ['lekt','a1','motive','3']
     level = parts[1]
     n     = int(parts[-1])
     book  = "_".join(parts[2:-1])
-
     label       = BOOK_LABELS[book]
     level_label = LEVEL_LABELS[level]
-
-    # Haqiqiy lug'at matnini olish
     content = get_lektion_text(level, book, n)
-
-    # Agar matn allaqachon sarlavhali bo'lsa (A1 Motive), shundayligicha yuboramiz
-    # Aks holda — sarlavha qo'shamiz
     if content.startswith("🇩🇪"):
         text = content
     else:
-        text = f"{level_label} \\| {label}\n📖 *Lektion {n}*\n\n{content}"
+        text = f"{level_label} \| {label}\n📖 *Lektion {n}*\n\n{content}"
 
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🧠 Yodlash", callback_data=f"quiz_start_{level}_{book}_{n}"),
             InlineKeyboardButton("🍅 Pomodoro", callback_data=f"pomodoro_start_{level}_{book}_{n}"),
         ],
-        [InlineKeyboardButton(
-            "↩️ Lektsiyalarga qaytish",
-            callback_data=f"book_{level}_{book}"
-        )],
+        [InlineKeyboardButton("↩️ Lektsiyalarga qaytish", callback_data=f"book_{level}_{book}")],
         [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
     ])
-
     await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
     return BOOK_MENU
 
@@ -1389,11 +1257,6 @@ async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 # ==================== TARJIMON ====================
 
 def build_dictionary() -> dict:
-    """
-    Barcha lug'atlardan ikki tomonlama qidiruv lug'atini yaratadi.
-    { "de_uz": {"der buchstabe": "harf", ...},
-      "uz_de": {"harf": "der Buchstabe", ...} }
-    """
     de_uz = {}
     uz_de = {}
     for level in ["a1"]:
@@ -1404,7 +1267,6 @@ def build_dictionary() -> dict:
                     uz_de[uzbek.lower()] = (german, uzbek)
     return {"de_uz": de_uz, "uz_de": uz_de}
 
-# Global lug'at — bot ishga tushganda bir marta quriladi
 _DICTIONARY: dict | None = None
 
 def get_dictionary() -> dict:
@@ -1415,84 +1277,43 @@ def get_dictionary() -> dict:
 
 
 async def ai_translate(word: str, direction: str) -> str:
-    """
-    Groq API orqali tarjima qiladi (so'z va uzun gaplar uchun).
-    direction: "uzb_deu" yoki "deu_uzb"
-    """
     if not GROQ_API_KEY:
-        return "❌ AI tarjimon sozlanmagan\\. GROQ\\_API\\_KEY kerak\\."
-
-    # So'z yoki gap ekanini aniqlash (3 so'zdan ko'p bo'lsa — gap)
+        return "❌ AI tarjimon sozlanmagan\. GROQ\_API\_KEY kerak\."
     is_sentence = len(word.strip().split()) > 3
-
     if direction == "uzb_deu":
         if is_sentence:
-            prompt = (
-                f"O'zbek tilidan nemis tiliga tarjima qil:\n\"{word}\"\n\n"
-                "Faqat tarjimani yoz. "
-                "To'liq, grammatik to'g'ri nemischa tarjima bo'lsin. "
-                "Hech qanday izoh, qo'shimcha matn yoki tirnoq yozma."
-            )
+            prompt = f"O'zbek tilidan nemis tiliga tarjima qil:\n\"{word}\"\n\nFaqat tarjimani yoz. To'liq, grammatik to'g'ri nemischa tarjima bo'lsin."
         else:
-            prompt = (
-                f"O'zbek tilidan nemis tiliga tarjima qil: \"{word}\"\n"
-                "Faqat tarjimani yoz, grammatik artikl (der/die/das) bilan birga. "
-                "Misol: \"kitob\" → \"das Buch\". "
-                "Hech qanday izoh, qo'shimcha matn yozma."
-            )
+            prompt = f"O'zbek tilidan nemis tiliga tarjima qil: \"{word}\"\nFaqat tarjimani yoz, grammatik artikl (der/die/das) bilan birga."
     else:
         if is_sentence:
-            prompt = (
-                f"Nemis tilidan o'zbek tiliga tarjima qil:\n\"{word}\"\n\n"
-                "Faqat tarjimani yoz. "
-                "To'liq, tabiiy o'zbekcha tarjima bo'lsin. "
-                "Hech qanday izoh, qo'shimcha matn yoki tirnoq yozma."
-            )
+            prompt = f"Nemis tilidan o'zbek tiliga tarjima qil:\n\"{word}\"\n\nFaqat tarjimani yoz. To'liq, tabiiy o'zbekcha tarjima bo'lsin."
         else:
-            prompt = (
-                f"Nemis tilidan o'zbek tiliga tarjima qil: \"{word}\"\n"
-                "Faqat tarjimani yoz. "
-                "Misol: \"das Buch\" → \"kitob\". "
-                "Hech qanday izoh, qo'shimcha matn yozma."
-            )
+            prompt = f"Nemis tilidan o'zbek tiliga tarjima qil: \"{word}\"\nFaqat tarjimani yoz."
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "max_tokens": 1024,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "content-type": "application/json"},
+                json={"model": "llama-3.1-8b-instant", "max_tokens": 1024, "messages": [{"role": "user", "content": prompt}]},
             )
         data = resp.json()
-        result = data["choices"][0]["message"]["content"].strip()
-        return result
+        return data["choices"][0]["message"]["content"].strip()
     except Exception as e:
         logger.error(f"AI tarjima xatosi: {e}")
-        return "❌ AI tarjimada xato yuz berdi\\. Qayta urinib ko'ring\\."
+        return "❌ AI tarjimada xato yuz berdi\. Qayta urinib ko'ring\."
 
 
 def esc_md(text: str) -> str:
-    """MarkdownV2 uchun barcha maxsus belgilarni escape qiladi."""
     for ch in r"\_*[]()~`>#+-=|{}.!":
-        text = text.replace(ch, f"\\{ch}")
+        text = text.replace(ch, f"\{ch}")
     return text
 
 
 async def do_translate(word: str, direction: str) -> str:
-    """
-    Avval lug'atdan qidiradi, topilmasa AI ga murojaat qiladi.
-    Tayyor MarkdownV2 matnini qaytaradi.
-    """
     d = get_dictionary()
     key = word.strip().lower()
-
     if direction == "uzb_deu":
         flag_from, flag_to = "🇺🇿", "🇩🇪"
         label = "O'zbekcha → Nemischa"
@@ -1513,7 +1334,6 @@ async def do_translate(word: str, direction: str) -> str:
             result_line = f"✅ *Lug'atdan:* {esc_md(uzbek)}"
         return header + word_line + result_line
     else:
-        # AI dan tarjima
         ai_result = await ai_translate(word, direction)
         ai_safe = esc_md(ai_result)
         return header + word_line + f"🤖 *AI tarjima:* {ai_safe}"
@@ -1522,11 +1342,7 @@ async def do_translate(word: str, direction: str) -> str:
 async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(
-        "🌐 *Tarjimon*\n\nQaysi yo'nalishda tarjima qilmoqchisiz?",
-        parse_mode="MarkdownV2",
-        reply_markup=translator_keyboard(),
-    )
+    await query.edit_message_text("🌐 *Tarjimon*\n\nQaysi yo'nalishda tarjima qilmoqchisiz?", parse_mode="MarkdownV2", reply_markup=translator_keyboard())
     return TRANSLATOR
 
 
@@ -1534,12 +1350,7 @@ async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     context.user_data["translator_dir"] = "uzb_deu"
-    await query.edit_message_text(
-        "🇺🇿➡️🇩🇪 *O'zbekcha \\-\\> Nemischa*\n\n"
-        "Menga xohlagan tarjima qilmoqchi bo'lgan so'zlarni yoki matnlarni yuboring\\! ⚡",
-        parse_mode="MarkdownV2",
-        reply_markup=back_to_main_keyboard(),
-    )
+    await query.edit_message_text("🇺🇿➡️🇩🇪 *O'zbekcha \-\-> Nemischa*\n\nMenga so'z yoki matn yuboring\! ⚡", parse_mode="MarkdownV2", reply_markup=back_to_main_keyboard())
     return UZB_DEU_INPUT
 
 
@@ -1547,17 +1358,11 @@ async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     context.user_data["translator_dir"] = "deu_uzb"
-    await query.edit_message_text(
-        "🇩🇪➡️🇺🇿 *Nemischa \\-\\> O'zbekcha*\n\n"
-        "Menga xohlagan tarjima qilmoqchi bo'lgan so'zlarni yoki matnlarni yuboring\\! ⚡",
-        parse_mode="MarkdownV2",
-        reply_markup=back_to_main_keyboard(),
-    )
+    await query.edit_message_text("🇩🇪➡️🇺🇿 *Nemischa \-\-> O'zbekcha*\n\nMenga so'z yoki matn yuboring\! ⚡", parse_mode="MarkdownV2", reply_markup=back_to_main_keyboard())
     return DEU_UZB_INPUT
 
 
 def translator_result_keyboard(direction: str) -> InlineKeyboardMarkup:
-    """Tarjima natijasi ostida ko'rsatiladigan tugmalar."""
     other = "deu_uzb" if direction == "uzb_deu" else "uzb_deu"
     other_label = "🇩🇪➡️🇺🇿 Nemischa→O'zbek" if direction == "uzb_deu" else "🇺🇿➡️🇩🇪 O'zbek→Nemis"
     return InlineKeyboardMarkup([
@@ -1569,55 +1374,52 @@ def translator_result_keyboard(direction: str) -> InlineKeyboardMarkup:
 
 
 async def translation_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Foydalanuvchi so'z yuborgan paytda chaqiriladi."""
     word = update.message.text.strip()
     if not word:
-        await update.message.reply_text("❗ Iltimos so'z yuboring\\.", parse_mode="MarkdownV2")
+        await update.message.reply_text("❗ Iltimos so'z yuboring\.", parse_mode="MarkdownV2")
         return context.user_data.get("translator_state", UZB_DEU_INPUT)
-
     direction = context.user_data.get("translator_dir", "uzb_deu")
-
-    # Yuklanmoqda...
-    loading_msg = await update.message.reply_text("⏳ Tarjima qilinmoqda\\.\\.\\.", parse_mode="MarkdownV2")
-
+    loading_msg = await update.message.reply_text("⏳ Tarjima qilinmoqda\.\.\.", parse_mode="MarkdownV2")
     result_text = await do_translate(word, direction)
-
     await loading_msg.delete()
-    await update.message.reply_text(
-        result_text,
-        parse_mode="MarkdownV2",
-        reply_markup=translator_result_keyboard(direction),
-    )
-
-    # Xuddi shu yo'nalishda davom etish uchun state saqlanadi
+    await update.message.reply_text(result_text, parse_mode="MarkdownV2", reply_markup=translator_result_keyboard(direction))
     return UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
 
 
-# ==================== OVOZLI SUHBAT (AI) ====================
+# ==================== OVOZLI SUHBAT (AI) - SODDALASHTIRILGAN ====================
 
 async def voice_chat_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Ovozli suhbat menyusini ko'rsatadi."""
+    """Erkin Sprechen boshlash - daraja tanlash."""
     query = update.callback_query
     await query.answer()
-    await query.edit_message_text(
-        "🎙️ *Ovozli AI Suhbat*\n\n"
-        "Nemis tilida gapiring — men eshitaman\\!\n\n"
-        "✅ Grammatik xatolarni to'g'irlayman\n"
-        "💡 O'zbekcha izoh beraman\n"
-        "🔊 Ovozli javob yuboraman\n\n"
-        "Ovozli xabar yuboring 👇",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("💡 Nima desam ekan?", callback_data=CB.VOICE_HINTS)],
-            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
-        ]),
+    try:
+        await query.edit_message_text("🗣️ *Erkin Sprechen*", parse_mode="MarkdownV2")
+    except:
+        pass
+
+    # Pastki oq panel (ReplyKeyboard)
+    keyboard = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🟢 A1"), KeyboardButton("🟢 A2")],
+            [KeyboardButton("🟡 B1"), KeyboardButton("🟡 B2")],
+            [KeyboardButton("🔴 C1")],
+            [KeyboardButton("⬅️ Asosiy menu")],
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False,
     )
-    context.user_data["chat_history"] = []
-    return VOICE_CHAT
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="🇩🇪 *Erkin Sprechen*\n\nDarajangizni tanlang:",
+        parse_mode="MarkdownV2",
+        reply_markup=keyboard,
+    )
+    return ERSP_LEVEL
 
 
 async def groq_stt(audio_path: str) -> str:
-    """Groq Whisper orqali ovozni nemis matniga aylantirish."""
+    """Groq Whisper - ovozni matnga."""
     if not GROQ_API_KEY:
         return ""
     try:
@@ -1637,38 +1439,27 @@ async def groq_stt(audio_path: str) -> str:
 
 
 async def analyze_german_speech(user_text: str) -> dict:
-    """Groq LLM orqali nemis tilini tahlil qilish."""
-    prompt = f"""Siz professional nemis tili o'qituvchisisiz. O'quvchi quyidagi gapni aytdi:
-
+    """AI tahlil - xatolarni topish."""
+    prompt = f"""Siz professional nemis tili o'qituvchisisiz. O'quvchi aytdi:
 "{user_text}"
 
-Quyidagi AYNAN shu formatda javob bering (boshqa hech narsa yozmasangiz):
-TO'G'RI: [agar xato bo'lsa to'g'ri variant, bo'lmasa faqat: OK]
+AYNAN shu formatda javob bering:
+TO'G'RI: [agar xato bo'lsa to'g'ri variant, bo'lmasa: OK]
 IZOH: [xato haqida qisqa izoh O'ZBEK TILIDA, yoki: Ajoyib!]
-JAVOB: [suhbatni davom ettirish uchun keyingi savol FAQAT NEMIS TILIDA]"""
+JAVOB: [keyingi savol FAQAT NEMIS TILIDA]"""
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.3,
-                    "max_tokens": 300,
-                },
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "content-type": "application/json"},
+                json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "temperature": 0.3, "max_tokens": 300},
             )
         data = resp.json()
         content = data["choices"][0]["message"]["content"]
-
         corrected = ""
         explanation = ""
         next_question = ""
-
         for line in content.split("\n"):
             line = line.strip()
             if line.startswith("TO'G'RI:"):
@@ -1677,77 +1468,363 @@ JAVOB: [suhbatni davom ettirish uchun keyingi savol FAQAT NEMIS TILIDA]"""
                 explanation = line.replace("IZOH:", "").strip()
             elif line.startswith("JAVOB:"):
                 next_question = line.replace("JAVOB:", "").strip()
-
         return {
-            "original": user_text,
-            "corrected": corrected,
-            "explanation": explanation,
+            "original": user_text, "corrected": corrected, "explanation": explanation,
             "next_question": next_question or "Was möchtest du noch besprechen?",
         }
     except Exception as e:
         logger.error(f"Tahlil xatosi: {e}")
-        return {
-            "original": user_text,
-            "corrected": "",
-            "explanation": "Tahlil qilishda xatolik.",
-            "next_question": "Kannst du das wiederholen?",
-        }
+        return {"original": user_text, "corrected": "", "explanation": "Tahlil qilishda xatolik.", "next_question": "Kannst du das wiederholen?"}
 
 
-async def edge_tts_speak(text: str, output_path: str):
-    """Microsoft Edge TTS orqali bepul nemis ovozi yaratish."""
+async def edge_tts_speak(text: str, output_path: str) -> bool:
+    """Microsoft Edge TTS - bepul nemis ovozi. MP3 chiqaradi."""
     try:
         import edge_tts
         communicate = edge_tts.Communicate(text, voice="de-DE-KatjaNeural")
         await communicate.save(output_path)
-        return True
+        return os.path.exists(output_path) and os.path.getsize(output_path) > 0
     except Exception as e:
         logger.error(f"TTS xatosi: {e}")
         return False
 
 
-async def voice_hints_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """'Nima desam ekan?' tugmasi - AI 2 ta javob varianti beradi."""
-    query = update.callback_query
-    await query.answer()
-
-    history = context.user_data.get("chat_history", [])
-    history_text = "\n".join(history[-4:]) if history else "Suhbat endigina boshlandi."
-
-    prompt = f"""O'quvchi nemis tilida suhbatlashmoqda, nima deyishini bilmayapti.
+async def generate_hints(history: list) -> str:
+    """Nima desam ekan? - AI variantlar."""
+    history_text = "\n".join(history[-4:]) if history else "Suhbat boshlandi."
+    prompt = f"""O'quvchi nemis tilida suhbatlashmoqda, nima deyishni bilmayapti.
 Oxirgi suhbat: {history_text}
 
-2 ta TAYYOR JAVOB varianti ber (nemis tilida):
-VARIANT 1: [oddiy variant]
+2 ta TAYYOR JAVOB (nemis tilida):
+VARIANT 1: [oddiy]
 TARJIMA 1: [o'zbekcha]
-VARIANT 2: [murakkabroq variant]
+VARIANT 2: [murakkab]
 TARJIMA 2: [o'zbekcha]"""
-
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "content-type": "application/json",
-                },
-                json={
-                    "model": "llama-3.1-8b-instant",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.5,
-                    "max_tokens": 200,
-                },
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "content-type": "application/json"},
+                json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "temperature": 0.5, "max_tokens": 200},
             )
-        data = resp.json()
-        content = data["choices"][0]["message"]["content"]
+        return resp.json()["choices"][0]["message"]["content"]
+    except:
+        return "VARIANT 1: Ich verstehe nicht.\nTARJIMA 1: Tushunmadim.\nVARIANT 2: Könnten Sie das wiederholen?\nTARJIMA 2: Qaytara olasizmi?"
 
-        msg = "💡 *Nima desam ekan?*\n\n" + esc_md(content)
+
+async def ersp_level_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Daraja tanlash."""
+    text = update.message.text
+    if "Asosiy" in text:
+        await update.message.reply_text("🏠 Asosiy menu", reply_markup=REPLY_KEYBOARD)
+        await update.message.reply_text("🏠 *Asosiy Menu*", parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+        return MAIN_MENU
+
+    level_map = {"A1": "a1", "A2": "a2", "B1": "b1", "B2": "b2", "C1": "c1"}
+    level = None
+    for k, v in level_map.items():
+        if k in text:
+            level = v
+            break
+    if not level:
+        await update.message.reply_text("Iltimos, tugmalardan birini bosing.")
+        return ERSP_LEVEL
+
+    context.user_data["ersp_level"] = level
+    keyboard = ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("⏱️ 15 daqiqa"), KeyboardButton("⏱️ 30 daqiqa")],
+            [KeyboardButton("⏱️ 1 soat"), KeyboardButton("⏱️ 2 soat")],
+            [KeyboardButton("⬅️ Orqaga")],
+        ],
+        resize_keyboard=True,
+    )
+    await update.message.reply_text(
+        f"✅ *{level.upper()}* tanlandi!\n\nKuniga necha minut vaqt ajrata olasiz?",
+        parse_mode="MarkdownV2", reply_markup=keyboard,
+    )
+    return ERSP_TIME
+
+
+async def ersp_time_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Vaqt tanlash."""
+    text = update.message.text
+    if "Orqaga" in text:
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("🟢 A1"), KeyboardButton("🟢 A2")], [KeyboardButton("🟡 B1"), KeyboardButton("🟡 B2")], [KeyboardButton("🔴 C1")], [KeyboardButton("⬅️ Asosiy menu")]],
+            resize_keyboard=True,
+        )
+        await update.message.reply_text("Darajangizni tanlang:", reply_markup=keyboard)
+        return ERSP_LEVEL
+
+    time_map = {"15 daqiqa": 15, "30 daqiqa": 30, "1 soat": 60, "2 soat": 120}
+    minutes = 15
+    for k, v in time_map.items():
+        if k in text:
+            minutes = v
+            break
+
+    context.user_data["ersp_time"] = minutes
+    level = context.user_data["ersp_level"]
+
+    # 10 ta so'z tayyorlash
+    words = []
+    if level == "a1":
+        for n in range(1, 9):
+            words.extend(parse_words("a1", "motive", n))
+    else:
+        # A2+ uchun AI dan so'zlar olish
+        prompt = f"Nemis tili {level.upper()} darajasi uchun 10 ta so'z va o'zbekcha tarjimasi. Format: der/so'z - tarjima"
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {GROQ_API_KEY}", "content-type": "application/json"},
+                    json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "max_tokens": 300},
+                )
+            content = resp.json()["choices"][0]["message"]["content"]
+            for line in content.split("\n"):
+                if " - " in line:
+                    parts = line.split(" - ", 1)
+                    de = parts[0].strip()
+                    uz = parts[1].strip()
+                    if de and uz:
+                        words.append((de, uz))
+        except:
+            pass
+        # Agar AI ishlamasa, A1 dan olish
+        if not words:
+            for n in range(1, 9):
+                words.extend(parse_words("a1", "motive", n))
+
+    random.shuffle(words)
+    words = words[:10]
+    context.user_data["ersp_words"] = words
+    context.user_data["ersp_word_index"] = 0
+    context.user_data["ersp_correct"] = 0
+
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("✅ Bildim"), KeyboardButton("❌ Bilmadim")], [KeyboardButton("🏠 Testni tugatish")]],
+        resize_keyboard=True,
+    )
+    await update.message.reply_text(
+        f"🧠 *10 ta so'z testi*\n\n🇩🇪 *Daraja:* {level.upper()}\n⏱️ *Kunlik vaqt:* {minutes} daqiqa\n\nSo'zni bilasizmi?",
+        parse_mode="MarkdownV2", reply_markup=keyboard,
+    )
+    return await show_next_ersp_word(update, context)
+
+
+async def show_next_ersp_word(update, context):
+    idx = context.user_data["ersp_word_index"]
+    words = context.user_data["ersp_words"]
+    if idx >= len(words):
+        correct = context.user_data["ersp_correct"]
+        total = len(words)
+        await update.message.reply_text(
+            f"🏁 *Test tugadi!*\n\n✅ {correct}/{total} ta so'zni bildingiz.\n\n🎙️ Endi *Erkin Sprechen* suhbatini boshlaymiz!\nNemis tilida gapiring, men to'g'rilab, javob beraman.",
+            parse_mode="MarkdownV2",
+        )
+        return await start_ersp_speaking(update, context)
+
+    german, uzbek = words[idx]
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("✅ Bildim"), KeyboardButton("❌ Bilmadim")], [KeyboardButton("🏠 Testni tugatish")]],
+        resize_keyboard=True,
+    )
+    await update.message.reply_text(
+        f"📝 *{idx+1}/10*\n\n🇩🇪 *{esc_md(german)}*\n\nTarjimasini bilasizmi?",
+        parse_mode="MarkdownV2", reply_markup=keyboard,
+    )
+    return ERSP_WORD_TEST
+
+
+async def ersp_test_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    text = update.message.text
+    idx = context.user_data["ersp_word_index"]
+    words = context.user_data["ersp_words"]
+
+    if "Tugatish" in text:
+        return await show_next_ersp_word(update, context)
+    if idx >= len(words):
+        return await show_next_ersp_word(update, context)
+
+    if "Bildim" in text:
+        context.user_data["ersp_correct"] += 1
+        await update.message.reply_text("✅ Zo'r! 👍")
+    elif "Bilmadim" in text:
+        german, uzbek = words[idx]
+        await update.message.reply_text(f"❌ {esc_md(german)} — *{esc_md(uzbek)}*", parse_mode="MarkdownV2")
+    else:
+        return ERSP_WORD_TEST
+
+    context.user_data["ersp_word_index"] += 1
+    return await show_next_ersp_word(update, context)
+
+
+async def start_ersp_speaking(update, context):
+    """Ovozli suhbatni boshlash."""
+    level = context.user_data["ersp_level"]
+    correct = context.user_data["ersp_correct"]
+    total = len(context.user_data["ersp_words"])
+    context.user_data["chat_history"] = []
+
+    # AI dan salom
+    prompt = f"Siz nemis tili o'qituvchisisiz. {level.upper()} darajadagi o'quvchi bilan suhbat boshlang. O'quvchi 10 tadan {correct} tasini topdi. Qisqa, iliq salomlashuv bilan boshlang. FAQAT nemis tilida."
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}", "content-type": "application/json"},
+                json={"model": "llama-3.1-8b-instant", "messages": [{"role": "user", "content": prompt}], "temperature": 0.5, "max_tokens": 150},
+            )
+        greeting = resp.json()["choices"][0]["message"]["content"].strip()
+    except:
+        greeting = "Hallo! Wie geht es dir heute? Was möchtest du besprechen?"
+
+    # TTS
+    tts_path = os.path.join(tempfile.gettempdir(), f"ersp_greet_{update.message.message_id}.mp3")
+    tts_success = await edge_tts_speak(greeting, tts_path)
+
+    keyboard = ReplyKeyboardMarkup(
+        [[KeyboardButton("💡 Nima desam ekan?"), KeyboardButton("🏁 Yakunlash")]],
+        resize_keyboard=True,
+    )
+
+    # Matn
+    await update.message.reply_text(
+        f"🤖 *Bot:* {esc_md(greeting)}\n\n🎙️ Ovozli xabar yuboring...",
+        parse_mode="MarkdownV2", reply_markup=keyboard,
+    )
+
+    # Audio (MP3 ni to'g'ridan-to'g'ri yuborish - ffmpeg SHART emas!)
+    if tts_success and os.path.exists(tts_path):
+        with open(tts_path, "rb") as f:
+            await update.message.reply_audio(audio=f, title="Bot javobi", performer="AI")
+        try:
+            os.remove(tts_path)
+        except:
+            pass
+
+    context.user_data["chat_history"] = [f"Bot: {greeting}"]
+    return ERSP_SPEAKING
+
+
+async def ersp_speaking_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Erkin Sprechen - matnli tugmalar."""
+    text = update.message.text
+
+    if "Yakunlash" in text:
+        await update.message.reply_text("🏁 *Erkin Sprechen tugadi!*\n\nYaxshi mashq qildingiz! 🎉", parse_mode="MarkdownV2", reply_markup=REPLY_KEYBOARD)
+        await update.message.reply_text("🏠 *Asosiy Menu*", parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+        return MAIN_MENU
+
+    if "Nima desam" in text:
+        history = context.user_data.get("chat_history", [])
+        hints = await generate_hints(history)
+        keyboard = ReplyKeyboardMarkup(
+            [[KeyboardButton("💡 Nima desam ekan?"), KeyboardButton("🏁 Yakunlash")]],
+            resize_keyboard=True,
+        )
+        await update.message.reply_text(f"💡 *Nima desam ekan?*\n\n{esc_md(hints)}", parse_mode="MarkdownV2", reply_markup=keyboard)
+        return ERSP_SPEAKING
+
+    # Agar ovoz bo'lsa - voice handler ga yo'naltirish
+    if update.message.voice:
+        return await voice_message_handler(update, context)
+
+    return ERSP_SPEAKING
+
+
+async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Foydalanuvchi ovoz yuborganida - ASOSIY HANDLER."""
+    processing_msg = await update.message.reply_text("🎙️ Ovozingiz tahlil qilinmoqda...")
+    voice_path = None
+    tts_path = None
+
+    try:
+        # 1. Ovozni yuklash
+        voice = update.message.voice
+        file = await context.bot.get_file(voice.file_id)
+        voice_path = os.path.join(tempfile.gettempdir(), f"voice_{update.message.message_id}.ogg")
+        await file.download_to_drive(voice_path)
+
+        # 2. STT
+        transcript = await groq_stt(voice_path)
+        if not transcript:
+            await processing_msg.edit_text("❌ Ovozni tanib bo'lmadi. Qayta urinib ko'ring.")
+            return VOICE_CHAT
+
+        # Tarix
+        history = context.user_data.get("chat_history", [])
+        history.append(f"Foydalanuvchi: {transcript}")
+        context.user_data["chat_history"] = history[-10:]
+
+        # 3. AI Tahlil
+        analysis = await analyze_german_speech(transcript)
+
+        # 4. Matnli javob
+        parts = [f"📝 *Siz aytdingiz:*\n{esc_md(transcript)}"]
+        is_correct = not analysis["corrected"] or analysis["corrected"].upper() in ["OK", "✅"]
+
+        if not is_correct and analysis["corrected"]:
+            parts.append(f"🎯 *To'g'rilash:*\n{esc_md(analysis['corrected'])}")
+        if analysis["explanation"] and analysis["explanation"].lower() not in ["ajoyib!", "ok"]:
+            parts.append(f"💡 *Izoh:*\n{esc_md(analysis['explanation'])}")
+        elif is_correct:
+            parts.append("✅ *Ajoyib! Hech qanday xato yo'q!*")
+        if analysis["next_question"]:
+            parts.append(f"🤖 *Bot javobi:*\n{esc_md(analysis['next_question'])}")
+            history.append(f"Bot: {analysis['next_question']}")
+            context.user_data["chat_history"] = history[-10:]
+
+        text_response = "\n\n".join(parts)
+
+        # 5. TTS - MP3 yaratish
+        tts_path = os.path.join(tempfile.gettempdir(), f"tts_{update.message.message_id}.mp3")
+        tts_success = False
+        if analysis["next_question"]:
+            tts_success = await edge_tts_speak(analysis["next_question"], tts_path)
+
+        # 6. Yuborish
+        await processing_msg.delete()
+
+        # Inline keyboard (matn ostida)
+        inline_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💡 Nima desam ekan?", callback_data=CB.VOICE_HINTS)],
+            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+        ])
+        await update.message.reply_text(text_response, parse_mode="MarkdownV2", reply_markup=inline_kb)
+
+        # 7. AUDIO - MP3 ni to'g'ridan-to'g'ri reply_audio orqali yuborish (ffmpeg SHART emas!)
+        if tts_success and os.path.exists(tts_path) and os.path.getsize(tts_path) > 0:
+            with open(tts_path, "rb") as f:
+                await update.message.reply_audio(audio=f, title="Bot javobi", performer="AI")
+        else:
+            await update.message.reply_text("🔇 Ovozli javob yaratilmadi")
+
     except Exception as e:
-        logger.error(f"Hints xatosi: {e}")
-        msg = "💡 *Namunalar:*\n\nVariant 1: Ich verstehe das nicht\\. \\(Tushunmadim\\.\\)\nVariant 2: Könnten Sie das bitte wiederholen? \\(Qaytara olasizmi?\\)"
+        logger.error(f"Voice handler xatosi: {e}")
+        await processing_msg.edit_text("❌ Xatolik yuz berdi. Qayta urinib ko'ring.")
 
+    finally:
+        for p in [voice_path, tts_path]:
+            if p and os.path.exists(p):
+                try:
+                    os.remove(p)
+                except:
+                    pass
+
+    return ERSP_SPEAKING
+
+
+async def voice_hints_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Inline 'Nima desam ekan?' tugmasi."""
+    query = update.callback_query
+    await query.answer()
+    history = context.user_data.get("chat_history", [])
+    hints = await generate_hints(history)
     await query.edit_message_text(
-        msg,
+        f"💡 *Nima desam ekan?*\n\n{esc_md(hints)}",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("💡 Yana variantlar", callback_data=CB.VOICE_HINTS)],
@@ -1757,148 +1834,44 @@ TARJIMA 2: [o'zbekcha]"""
     return VOICE_CHAT
 
 
-async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Foydalanuvchi ovoz yuborganida ishlaydi."""
-    processing_msg = await update.message.reply_text("🎙️ Ovozingiz tahlil qilinmoqda...")
-
-    voice_path = None
-    tts_path = None
-
-    try:
-        # 1. Ovoz faylini yuklab olish
-        voice = update.message.voice
-        file = await context.bot.get_file(voice.file_id)
-
-        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
-            await file.download_to_drive(tmp.name)
-            voice_path = tmp.name
-
-        # 2. STT: Ovoz → Matn (Groq Whisper)
-        transcript = await groq_stt(voice_path)
-        if not transcript:
-            await processing_msg.edit_text("❌ Ovozni tanib bo'lmadi. Qayta urinib ko'ring.")
-            return VOICE_CHAT
-
-        # Suhbat tarixini saqlash
-        history = context.user_data.get("chat_history", [])
-        history.append(f"Foydalanuvchi: {transcript}")
-        context.user_data["chat_history"] = history[-10:]
-
-        # 3. AI Tahlil
-        analysis = await analyze_german_speech(transcript)
-
-        # 4. Matnli javob tayyorlash
-        parts = [f"📝 *Siz aytdingiz:*\n{esc_md(transcript)}"]
-
-        is_correct = not analysis["corrected"] or analysis["corrected"].upper() == "OK"
-
-        if not is_correct and analysis["corrected"]:
-            parts.append(f"🎯 *To'g'rilash:*\n{esc_md(analysis['corrected'])}")
-
-        if analysis["explanation"] and analysis["explanation"].lower() != "ajoyib!":
-            parts.append(f"💡 *Izoh:*\n{esc_md(analysis['explanation'])}")
-        elif is_correct:
-            parts.append("✅ *Ajoyib\\! Hech qanday xato yo'q\\!*")
-
-        if analysis["next_question"]:
-            parts.append(f"🤖 *Bot javobi:*\n{esc_md(analysis['next_question'])}")
-            history.append(f"Bot: {analysis['next_question']}")
-            context.user_data["chat_history"] = history[-10:]
-
-        text_response = "\n\n".join(parts)
-
-        # 5. TTS: Javobni ovozga aylantirish
-        tts_success = False
-        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tts_tmp:
-            tts_path = tts_tmp.name
-
-        if analysis["next_question"]:
-            tts_success = await edge_tts_speak(analysis["next_question"], tts_path)
-
-        # 6. Natijalarni yuborish
-        await processing_msg.delete()
-
-        await update.message.reply_text(
-            text_response,
-            parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("💡 Nima desam ekan?", callback_data=CB.VOICE_HINTS)],
-                [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
-            ]),
-        )
-
-        # Ovozli javob
-        if tts_success and os.path.exists(tts_path) and os.path.getsize(tts_path) > 0:
-            with open(tts_path, "rb") as voice_file:
-                await update.message.reply_voice(voice=voice_file)
-
-    except Exception as e:
-        logger.error(f"Voice handler xatosi: {e}")
-        await processing_msg.edit_text("❌ Xatolik yuz berdi. Qayta urinib ko'ring.")
-
-    finally:
-        if voice_path and os.path.exists(voice_path):
-            os.remove(voice_path)
-        if tts_path and os.path.exists(tts_path):
-            os.remove(tts_path)
-
-    return VOICE_CHAT
-
-
 # ==================== YORDAM ====================
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
     await query.edit_message_text(
-        "ℹ️ *Yordam*\n\n"
-        "/start \\— Botni ishga tushirish\n"
-        "/menu \\— Asosiy menyu\n\n"
+        "ℹ️ *Yordam*\n\n/start \— Botni ishga tushirish\n/menu \— Asosiy menyu\n\n"
         "📚 *Darajalar:* A1, A2, B1, B2, C1\n"
-        "📗 A1/A2/B1 \\— Motive, Schritte, Menschen\n"
-        "📙 B2/C1 \\— Sicher, KompassDaF, Aspekte\n"
-        "🌐 Tarjimon \\— UZB↔DEU\n\n"
-        "✅ *Hozirda mavjud:* A1 Motive 1\\-8 lektsiyalar",
-        parse_mode="MarkdownV2",
-        reply_markup=back_to_main_keyboard(),
+        "🗣️ *Erkin Sprechen* \— AI bilan ovozli suhbat\n"
+        "🌐 Tarjimon \— UZB↔DEU\n\n"
+        "✅ *Hozirda mavjud:* A1 Motive 1\-8 lektsiyalar",
+        parse_mode="MarkdownV2", reply_markup=back_to_main_keyboard(),
     )
     return MAIN_MENU
 
+
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "🏠 *Asosiy Menu*\n\nBo'limni tanlang:",
-        parse_mode="MarkdownV2",
-        reply_markup=main_menu_keyboard(),
-    )
+    await update.message.reply_text("🏠 *Asosiy Menu*\n\nBo'limni tanlang:", parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "ℹ️ *Yordam*\n\n/start \\— Boshlash\n/menu \\— Menyu",
-        parse_mode="MarkdownV2",
-        reply_markup=back_to_main_keyboard(),
-    )
+    await update.message.reply_text("ℹ️ *Yordam*\n\n/start \— Boshlash\n/menu \— Menyu", parse_mode="MarkdownV2", reply_markup=back_to_main_keyboard())
 
-
-# ==================== PASTKI MENYU HANDLER ====================
 
 async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """'📚 Menyu' tugmasi bosilganda buyruqlar ro'yxatini ko'rsatadi."""
     text = (
         "📋 *Tez buyruqlar:*\n\n"
-        "/start \\— Botni qayta boshlash\n"
-        "/menu \\— Asosiy menyu\n"
-        "/help \\— Yordam\n\n"
+        "/start \— Botni qayta boshlash\n"
+        "/menu \— Asosiy menyu\n"
+        "/help \— Yordam\n\n"
         "📚 *Bo'limlar:*\n"
-        "• Daraja tanlash \\(A1\\-C1\\)\n"
+        "• Daraja tanlash \(A1\-C1\)\n"
         "• Lug'at va flashcard testlar\n"
         "• 🍅 Pomodoro taymer\n"
+        "• 🗣️ Erkin Sprechen\n"
         "• 🌐 Tarjimon"
     )
-    await update.message.reply_text(
-        text,
-        parse_mode="MarkdownV2",
-        reply_markup=main_menu_keyboard(),
-    )
+    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
 
 
 # ==================== MAIN ====================
@@ -1926,12 +1899,10 @@ def main() -> None:
         CallbackQueryHandler(book_select_handler,  pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
         CallbackQueryHandler(back_book_handler,    pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
         CallbackQueryHandler(lektion_handler,      pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
-        # Quiz
         CallbackQueryHandler(quiz_start_handler,   pattern=r"^quiz_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
         CallbackQueryHandler(quiz_know_handler,    pattern=f"^{CB.QUIZ_KNOW}$"),
         CallbackQueryHandler(quiz_dontknow_handler,pattern=f"^{CB.QUIZ_DONTKNOW}$"),
         CallbackQueryHandler(quiz_repeat_handler,  pattern=f"^{CB.QUIZ_REPEAT}$"),
-        # Pomodoro
         CallbackQueryHandler(pomodoro_start_handler, pattern=r"^pomodoro_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
         CallbackQueryHandler(pomodoro_stop_handler,  pattern=f"^{CB.POMODORO_STOP}$"),
     ]
@@ -1965,6 +1936,23 @@ def main() -> None:
             VOICE_CHAT: common_handlers + [
                 MessageHandler(filters.VOICE, voice_message_handler),
             ],
+            # YANGI ERKIN SPRECHEN STATES
+            ERSP_LEVEL: common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ersp_level_handler),
+                MessageHandler(filters.VOICE, voice_message_handler),
+            ],
+            ERSP_TIME: common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ersp_time_handler),
+                MessageHandler(filters.VOICE, voice_message_handler),
+            ],
+            ERSP_WORD_TEST: common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ersp_test_handler),
+                MessageHandler(filters.VOICE, voice_message_handler),
+            ],
+            ERSP_SPEAKING: common_handlers + [
+                MessageHandler(filters.VOICE, voice_message_handler),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, ersp_speaking_handler),
+            ],
         },
         fallbacks=[
             CommandHandler("start", start),
@@ -1978,9 +1966,7 @@ def main() -> None:
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler
-    ))
+    application.add_handler(MessageHandler(filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler))
 
     print("🤖 Bot ishga tushdi...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
