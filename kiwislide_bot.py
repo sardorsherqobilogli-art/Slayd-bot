@@ -1191,11 +1191,13 @@ def translator_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = (
-        "🎉 *Sprechen mit Spaß\\!* 🇩🇪\n\n"
-"🚀 Nemis tilini o'rganishga xush kelibsiz\\!\n\n"
-"✨ A1 dan C1 gacha — har bir qadamda biz birgamiz\\!\n"
-"💪 Har kun biroz — katta natija\\!\n\n"
-"📚 Qayerdan boshlaymiz?"
+       "🎉 *Sprechen mit Spaß! Willkommen!* 🇩🇪\n\n"
+        "Siz oddiy botga emas, nemis tilini **raketa tezligida** o'rgatuvchi shaxsiy murabbiyingiz safiga qo'shildingiz! 🚀\n\n"
+        "✨ *Bu yerda sizni nimalar kutmoqda:*\n"
+        "• Har kuni atigi 15 daqiqada yangi daraja! 🔥\n"
+        "• Miyani charchatmaydigan intellektual Quiz testlar! 🧠\n"
+        "• Fokusni 100% ga oshiruvchi Pomodoro taymer! 🍅\n\n"
+        "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring! 👇"
     )
     if update.message:
         await update.message.reply_text(text, parse_mode="MarkdownV2",
