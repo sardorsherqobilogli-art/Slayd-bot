@@ -1220,16 +1220,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring\\! 👇"
     )
     if update.message:
-        # Avval pastki doimiy menyu tugmasini o'rnat
-        await update.message.reply_text(
-            ".",
-            reply_markup=REPLY_KEYBOARD,
-        )
-        # Keyin asosiy inline menyu
         await update.message.reply_text(
             text,
             parse_mode="MarkdownV2",
             reply_markup=main_menu_keyboard(),
+        )
+        # Pastki doimiy menyu tugmasini o'rnat (alohida xabar sifatida)
+        await update.message.reply_text(
+            "👇 Pastdagi tugmadan foydalaning:",
+            reply_markup=REPLY_KEYBOARD,
         )
     elif update.callback_query:
         await update.callback_query.answer()
@@ -1626,14 +1625,17 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 # ==================== PASTKI MENYU HANDLER ====================
 
 async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """'📚 Menyu' tugmasi bosilganda inline menyuni ko'rsatadi."""
+    """'📚 Menyu' tugmasi bosilganda buyruqlar ro'yxatini ko'rsatadi."""
     text = (
-        "📋 *Buyruqlar:*\n\n"
+        "📋 *Tez buyruqlar:*\n\n"
         "/start \\— Botni qayta boshlash\n"
-        "/menu \\— Asosiy menyu\n\n"
-        "📊 *Tez buyruqlar:*\n"
-        "• /start\n"
-        "• /menu"
+        "/menu \\— Asosiy menyu\n"
+        "/help \\— Yordam\n\n"
+        "📚 *Bo'limlar:*\n"
+        "• Daraja tanlash \\(A1\\-C1\\)\n"
+        "• Lug'at va flashcard testlar\n"
+        "• 🍅 Pomodoro taymer\n"
+        "• 🌐 Tarjimon"
     )
     await update.message.reply_text(
         text,
