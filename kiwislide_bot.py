@@ -3,9 +3,11 @@
 """
 Deutsch Booster - Telegram Bot
 python-telegram-bot v20+
+Railway: BOT_TOKEN environment variable kerak
 """
 
 import logging
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -16,7 +18,7 @@ from telegram.ext import (
 )
 
 # ==================== KONFIGURATSIYA ====================
-TOKEN = "SIZNING_BOT_TOKENINGIZ"
+TOKEN = os.environ.get("BOT_TOKEN", "SIZNING_BOT_TOKENINGIZ")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -52,7 +54,6 @@ class CB:
 
 
 # ==================== LEKTION RANGE CONFIG ====================
-# format: (kitob_nomi, daraja, boshlang'ich_lektion, oxirgi_lektion)
 BOOK_LEKTIONS = {
     "a1_motive":   (1, 8),
     "a1_schritte": (1, 14),
@@ -76,12 +77,12 @@ BOOK_LEKTIONS = {
 }
 
 BOOK_LABELS = {
-    "motive":    "📗 MOTIVE",
-    "schritte":  "📙 SCHRITTE",
-    "menschen":  "📕 MENSCHEN",
-    "sicher":    "📗 Sicher",
-    "kompassdaf":"📙 KompassDaF",
-    "aspekte":   "📕 Aspekte",
+    "motive":     "📗 MOTIVE",
+    "schritte":   "📙 SCHRITTE",
+    "menschen":   "📕 MENSCHEN",
+    "sicher":     "📗 Sicher",
+    "kompassdaf": "📙 KompassDaF",
+    "aspekte":    "📕 Aspekte",
 }
 
 LEVEL_BOOKS = {
@@ -99,6 +100,740 @@ LEVEL_LABELS = {
     "b2": "🟡 B2 \\- Upper\\-Intermediate",
     "c1": "🔴 C1 \\- Advanced",
 }
+
+
+# ==================== A1 MOTIVE LUGATLARI ====================
+
+A1_MOTIVE_LEKTIONS = {
+    1: """🇩🇪 *A1 • MOTIVE • Lektion 1*
+
+🔸 der Buchstabe \- harf
+🔹 das Wiedersehen \- ko'rishguncha
+🔸 buchstabieren \- harflab aytmoq
+🔹 willkommen \- xush kelibsiz
+🔸 Auf Wiedersehen \- xayr
+🔹 der Automat \- avtomat
+🔸 das Baby \- chaqaloq
+🔹 die Banane \- banan
+🔸 der Computer \- kompyuter
+🔹 der Film \- film
+🔸 das Foto \- fotosurat
+🔹 der Geldautomat \- bankomat
+🔸 das Hotel \- mehmonxona
+🔹 das Internet \- internet
+🔸 der Kaffee \- qahva
+🔹 das Museum \- muzey
+🔸 die Post \- pochta
+🔹 das Radio \- radio
+🔸 die SMS \- sms
+🔹 das Taxi \- taksi
+🔸 das Telefon \- telefon
+🔹 die Universität \- universitet
+🔸 das Wort \- so'z
+🔹 deutsch \- nemischa
+🔸 international \- xalqaro
+🔹 das Beispiel \- misol
+🔸 die Entscheidung \- qaror
+🔹 der Familienname \- familiya
+🔸 die Frau \- ayol
+🔹 der Herr \- janob
+🔸 der Name \- ism
+🔹 die Person \- shaxs
+🔸 der Teil \- qism
+🔹 der Vorname \- ism
+🔸 heißen \- nomlanmoq
+🔹 lesen \- o'qimoq
+🔸 du \- sen
+🔹 Sie \- siz
+🔸 wie \- qanday
+🔹 das Handy \- telefon
+🔸 neu \- yangi
+🔹 falsch \- noto'g'ri
+🔸 richtig \- to'g'ri
+🔹 wichtig \- muhim
+🔸 acht \- sakkiz
+🔹 bitte \- iltimos
+🔸 dann \- keyin
+🔹 drei \- uch
+🔸 eins \- bir
+🔹 fünf \- besh
+🔸 nein \- yo'q
+🔹 neun \- to'qqiz
+🔸 sechs \- olti
+🔹 sieben \- yetti
+🔸 vier \- to'rt
+🔹 von \- dan
+🔸 zwei \- ikki
+🔹 zehn \- o'n
+🔸 zwölf \- o'n ikki
+🔹 das Café \- kafe
+🔸 Deutschland \- Germaniya
+🔹 die Uhr \- soat
+🔸 kommen \- kelmoq
+🔹 vergleichen \- solishtirmoq
+🔸 auch \- ham
+🔹 aus \- dan
+🔸 ihr \- sizlar
+🔹 in \- ichida
+🔸 nicht \- emas
+🔹 sie \- ular
+🔸 wir \- biz
+🔹 der Abend \- kech
+🔸 die Frage \- savol
+🔹 der Mittag \- peshin
+🔸 der Morgen \- ertalab
+🔹 der Nachmittag \- tushdan keyin
+🔸 die Nacht \- tun
+🔹 der Vormittag \- tushgacha
+🔸 spät \- kech
+🔹 elf \- o'n bir
+🔸 es \- u neutrum
+🔹 das Bild \- rasm
+🔸 der Dienstag \- seshanba
+🔹 der Montag \- dushanba
+🔸 die Tabelle \- jadval
+🔹 glauben \- ishonmoq
+🔸 haben \- ega bo'lmoq
+🔹 sein \- bo'lmoq
+🔸 frei \- bo'sh
+🔹 aber \- lekin
+🔸 am \- da
+🔹 am Morgen \- ertalab
+🔸 da \- u yerda
+🔹 dort \- u yerda
+🔸 in der Nacht \- tunda
+🔹 morgen \- ertaga
+🔸 oder \- yoki
+🔹 wann \- qachon
+🔸 wo \- qayerda
+🔹 der Donnerstag \- payshanba
+🔸 der Freitag \- juma
+🔹 der Mittwoch \- chorshanba
+🔸 der Samstag \- shanba
+🔹 der Sonntag \- yakshanba
+🔸 der Wochentag \- hafta kuni
+🔹 antworten \- javob bermoq
+🔸 fragen \- so'ramoq
+🔹 heute \- bugun
+🔸 was \- nima
+🔹 ja \- ha
+🔸 der Bleistift \- qalam
+🔹 das Buch \- kitob
+🔸 die CD \- disk
+🔹 das Fenster \- deraza
+🔸 das Heft \- daftarcha
+🔹 der Kugelschreiber \- ruchka
+🔸 die Lampe \- chiroq
+🔹 die Nummer \- raqam
+🔸 das Papier \- qog'oz
+🔹 der Stuhl \- stul
+🔸 der Tisch \- stol
+🔹 man \- odam
+🔸 schreiben \- yozmoq
+🔹 denn \- chunki
+🔸 ein \- bir
+🔹 das Auto \- avtomobil
+🔸 der Bus \- avtobus
+🔹 der Hamburger \- gamburger
+🔸 die Pizza \- pizza
+🔹 die Polizei \- politsiya
+🔸 der Satz \- gap
+🔹 die Seite \- sahifa
+🔸 das WC \- hojatxona
+🔹 kennen \- bilmoq
+🔸 doch \- baribir
+🔹 kein \- hech qanday""",
+
+    2: """🇩🇪 *A1 • MOTIVE • Lektion 2*
+
+🔸 das Ausland \- chet el
+🔹 der/die Bekannte \- tanish
+🔸 die E\-Mail \- elektron pochta
+🔹 der Tag \- kun
+🔸 telefonieren \- telefonlashmoq
+🔹 gut \- yaxshi
+🔸 jetzt \- hozir
+🔹 sehr \- juda
+🔸 die Antwort \- javob
+🔹 die Familie \- oila
+🔸 die Musik \- musiqa
+🔹 der Punkt \- nuqta
+🔸 das Quiz \- viktorina
+🔹 der Schauspieler \- aktyor
+🔸 finden \- topmoq
+🔹 spielen \- o'ynamoq
+🔸 surfen \- internetda kezmoq
+🔹 Tennis spielen \- tennis o'ynamoq
+🔸 wandern \- sayr qilmoq
+🔹 schön \- chiroyli
+🔸 für \- uchun
+🔹 gern \- yoqtirib
+🔸 Lieblings\- \- sevimli
+🔹 die Sprache \- til
+🔸 arbeiten \- ishlamoq
+🔹 kochen \- ovqat pishirmoq
+🔸 lernen \- o'rganmoq
+🔹 machen \- qilmoq
+🔸 schwimmen \- suzmoq
+🔹 tanzen \- raqs tushmoq
+🔸 das Fernsehen \- televideniye
+🔹 der Fußball \- futbol
+🔸 der Jazz \- jazz
+🔹 die Mathematik \- matematika
+🔸 Österreich \- Avstriya
+🔹 interessant \- qiziqarli
+🔸 langweilig \- zerikarli
+🔹 schrecklich \- dahshatli
+🔸 toll \- ajoyib
+🔹 das Land \- mamlakat
+🔸 die Schauspielerin \- aktrisa
+🔹 der Sportler \- sportchi
+🔸 die Stadt \- shahar
+🔹 die Zahl \- son
+🔸 meinen \- o'ylamoq
+🔹 dein \- sening
+🔸 Ihr \- sizning
+🔹 wie bitte \- uzr, nima dedingiz?""",
+
+    3: """🇩🇪 *A1 • MOTIVE • Lektion 3*
+
+🔸 der Beruf \- kasb
+🔹 der Bruder \- aka, uka
+🔸 die Eltern \- ota\-ona
+🔹 die Frau \- ayol
+🔸 der Freund \- do'st
+🔹 die Geschwister \- aka\-uka, opa\-singil
+🔸 das Kind \- bola
+🔹 der Cousin \- amakivachcha o'g'il
+🔸 die Cousine \- amakivachcha qiz
+🔹 die Großeltern \- bobo va buvi
+🔸 die Großmutter \- buvi
+🔹 der Großvater \- bobo
+🔸 die Mutter \- ona
+🔹 die Oma \- buvi
+🔸 der Onkel \- amaki, tog'a
+🔹 der Opa \- bobo
+🔸 die Tante \- xola, amma
+🔹 der Vater \- ota
+🔸 ihr \- ularning
+🔹 das Leben \- hayot
+🔸 die Liebe \- sevgi
+🔹 der Mann \- erkak
+🔸 der Partner \- sherik
+🔹 die Schwester \- opa, singil
+🔸 der Sohn \- o'g'il
+🔹 das Thema \- mavzu
+🔸 die Tochter \- qiz farzand
+🔹 leben \- yashamoq
+🔸 lieben \- sevmoq
+🔹 sagen \- aytmoq
+🔸 wohnen \- yashamoq
+🔹 allein \- yolg'iz
+🔸 einfach \- oddiy
+🔹 geschieden \- ajrashgan
+🔸 groß \- katta
+🔹 klein \- kichik
+🔸 verheiratet \- turmush qurgan
+🔹 als \- sifatida
+🔸 immer \- har doim
+🔹 noch \- hali ham
+🔸 sein \- uning
+🔹 viel \- ko'p
+🔸 wie viele \- nechta?""",
+
+    4: """🇩🇪 *A1 • MOTIVE • Lektion 4*
+
+🔸 die Arbeit \- ish
+🔹 der Arzt \- shifokor erkak
+🔸 die Ärztin \- shifokor ayol
+🔹 das Essen \- ovqat
+🔸 die Form \- shakl
+🔹 Frankreich \- Fransiya
+🔸 der Friseur \- sartarosh erkak
+🔹 die Friseurin \- sartarosh ayol
+🔸 Griechenland \- Gretsiya
+🔹 Großbritannien \- Buyuk Britaniya
+🔸 das Heim \- uy
+🔹 der Ingenieur \- muhandis erkak
+🔸 die Ingenieurin \- muhandis ayol
+🔹 Italien \- Italiya
+🔸 das Jahr \- yil
+🔹 der Job \- ish
+🔸 die Kabine \- kabina
+🔹 der Kellner \- ofitsiant erkak
+🔸 die Kellnerin \- ofitsiant ayol
+🔹 der Koch \- oshpaz erkak
+🔸 die Köchin \- oshpaz ayol
+🔹 der Krankenpfleger \- hamshira erkak
+🔸 die Krankenschwester \- hamshira ayol
+🔹 die Liste \- ro'yxat
+🔸 der Manager \- menejer
+🔹 die Managerin \- menejer ayol
+🔸 das Meer \- dengiz
+🔹 der Musiker \- musiqachi erkak
+🔸 die Musikerin \- musiqachi ayol
+🔹 Rumänien \- Ruminiya
+🔸 das Schiff \- kema
+🔹 die Sonne \- quyosh
+🔸 Spanien \- Ispaniya
+🔹 der Steward \- bort kuzatuvchisi erkak
+🔸 die Stewardess \- bort kuzatuvchisi ayol
+🔹 die Stunde \- soat
+🔸 das Team \- jamoa
+🔹 die Türkei \- Turkiya
+🔸 die Ukraine \- Ukraina
+🔹 die Woche \- hafta
+🔸 alt \- eski
+🔹 männlich \- erkak jinsli
+🔸 schlecht \- yomon
+🔹 weiblich \- ayol jinsli
+🔸 auf \- ustida
+🔹 geboren \- tug'ilgan
+🔸 manchmal \- ba'zan
+🔹 schon \- allaqachon
+🔸 dreizehn \- o'n uch
+🔹 hundert \- yuz
+🔸 zwanzig \- yigirma
+🔹 das Alter \- yosh
+🔸 Schweden \- Shvetsiya
+🔹 der Tourist \- sayyoh erkak
+🔸 die Touristin \- sayyoh ayol
+🔹 selbstständig \- mustaqil""",
+
+    5: """🇩🇪 *A1 • MOTIVE • Lektion 5*
+
+🔸 die Kommunikation \- kommunikatsiya
+🔹 der Konsum \- iste'mol
+🔸 das Lebensmittel \- oziq\-ovqat
+🔹 das Restaurant \- restoran
+🔸 der Sport \- sport
+🔹 der Urlaub \- ta'til
+🔸 die Ferien \- ta'til
+🔹 die Wohnung \- kvartira
+🔸 chatten \- chatlashmoq
+🔹 fahren \- haydamoq
+🔸 etwas \- nimadir
+🔹 nichts \- hech narsa
+🔸 so \- shunday
+🔹 zweimal \- ikki marta
+🔸 die Blume \- gul
+🔹 die Briefmarke \- marka
+🔸 das Fahrrad/das Velo \- velosiped
+🔹 der Fernseher \- televizor
+🔸 die Hose \- shim
+🔹 der Kühlschrank \- muzlatkich
+🔸 der Schrank \- shkaf
+🔹 das Spiel \- o'yin
+🔸 mehr \- ko'proq
+🔹 der Cent \- sent
+🔸 der Euro \- yevro
+🔹 der Preis \- narx
+🔸 billig \- arzon
+🔹 teuer \- qimmat
+🔸 nur \- faqat
+🔹 wie viel \- qancha
+🔸 der Apfel \- olma
+🔹 die Birne \- nok
+🔸 das Brot \- non
+🔹 das Brötchen \- bulochka
+🔸 die Butter \- sariyog'
+🔹 die Cola \- kola
+🔸 das Ei \- tuxum
+🔹 das Eis \- muzqaymoq
+🔸 der Fisch \- baliq
+🔹 das Fleisch \- go'sht
+🔸 das Joghurt \- yogurt
+🔹 die Karotte \- sabzi
+🔸 die Kartoffel \- kartoshka
+🔹 der Käse \- pishloq
+🔸 die Milch \- sut
+🔹 die Nudel \- makaron
+🔸 die Orange \- apelsin
+🔹 der Reis \- guruch
+🔸 der Salat \- salat
+🔹 der Tee \- choy
+🔸 die Tomate \- pomidor
+🔹 die Wurst \- kolbasa
+🔸 leer \- bo'sh
+🔹 der Supermarkt \- supermarket
+🔸 mögen \- yoqtirmoq
+🔹 schmecken \- ta'mi yoqmoq
+🔸 trinken \- ichmoq
+🔹 nie \- hech qachon
+🔸 der Appetit \- ishtaha
+🔹 das Frühstück \- nonushta
+🔸 das Gemüse \- sabzavot
+🔹 der Hunger \- ochlik
+🔸 die Kantine \- oshxona
+🔹 der Kuchen \- pirog
+🔸 die Pommes frites \- kartoshka fri
+🔹 die Sahne \- qaymoq
+🔸 einkaufen \- xarid qilmoq
+🔹 geöffnet \- ochiq
+🔸 geschlossen \- yopiq
+🔹 halb \- yarmi
+🔸 wenig \- oz
+🔹 mit \- bilan
+🔸 nach \- keyin
+🔹 um \- da vaqtda
+🔸 vor \- oldin
+🔹 zu Mittag \- tushlik vaqtida
+🔸 nehmen \- olmoq
+🔹 treffen \- uchrashmoq
+🔸 leider \- afsuski
+🔹 meistens \- ko'pincha
+🔸 vielleicht \- balki
+🔹 zusammen \- birga""",
+
+    6: """🇩🇪 *A1 • MOTIVE • Lektion 6*
+
+🔸 der Alltag \- kundalik hayot
+🔹 das Büro \- ofis
+🔸 die Freizeit \- bo'sh vaqt
+🔹 der Künstler \- rassom, san'atkor
+🔸 der Kurs \- kurs
+🔹 das Lied \- qo'shiq
+🔸 der Student \- talaba
+🔹 das Studium \- o'qish universitetda
+🔸 frühstücken \- nonushta qilmoq
+🔹 hören \- eshitmoq
+🔸 studieren \- o'qimoq
+🔹 verkaufen \- sotmoq
+🔸 verlieren \- yo'qotmoq
+🔹 verstehen \- tushunmoq
+🔸 warten \- kutmoq
+🔹 allmählich \- asta\-sekin
+🔸 manche \- ba'zi
+🔹 sicher \- ishonchli
+🔸 virtuell \- virtual
+🔹 niemand \- hech kim
+🔸 schnell \- tez
+🔹 die Bank \- bank
+🔸 der Fan \- muxlis
+🔹 das Gefühl \- his
+🔸 das Interview \- intervyu
+🔹 der Journalist \- jurnalist
+🔸 der Spaß \- zavq
+🔹 der Trainer \- murabbiy
+🔸 das Training \- mashg'ulot
+🔹 ankommen \- yetib kelmoq
+🔸 anrufen \- qo'ng'iroq qilmoq
+🔹 anziehen \- kiymoq
+🔸 aussehen \- ko'rinmoq
+🔹 mitmachen \- qatnashmoq
+🔸 durstig \- chanqoq
+🔹 hungrig \- och
+🔸 lustig \- qiziqarli
+🔹 müde \- charchagan
+🔸 nervös \- asabiy
+🔹 traurig \- qayg'uli
+🔸 wütend \- g'azablangan
+🔹 zufrieden \- mamnun
+🔸 genug \- yetarli
+🔹 wieder \- yana
+🔸 die Hausaufgabe \- uy vazifasi
+🔹 das Konzert \- konsert
+🔸 aufmachen \- ochmoq
+🔹 kennenlernen \- tanishmoq
+🔸 mieten \- ijaraga olmoq
+🔹 reisen \- sayohat qilmoq
+🔸 suchen \- qidirmoq
+🔹 verdienen \- topmoq
+🔸 wollen \- xohlamoq
+🔹 ganz \- butunlay
+🔸 normal \- normal
+🔹 sogar \- hattoki
+🔸 die Firma \- firma
+🔹 die Stelle \- ish joyi
+🔸 aufhören \- to'xtatmoq
+🔹 dürfen \- ruxsat bo'lmoq
+🔸 grillen \- grilda pishirmoq
+🔹 mitbringen \- olib kelmoq
+🔸 rauchen \- chekish
+🔹 fit \- baquvvat
+🔸 laut \- baland ovozli""",
+
+    7: """🇩🇪 *A1 • MOTIVE • Lektion 7*
+
+🔸 einladen \- taklif qilmoq
+🔹 die Ampel \- svetofor
+🔸 die Apotheke \- dorixona
+🔹 der Dieb \- o'g'ri
+🔸 der Experte \- ekspert
+🔹 die Freiheit \- erkinlik
+🔸 die Kontrolle \- nazorat
+🔹 der Polizist \- politsiyachi
+🔸 die Straße \- ko'cha
+🔹 der Weg \- yo'l
+🔸 das Ziel \- maqsad, manzil
+🔹 ausgehen \- tashqariga chiqmoq
+🔸 gehen \- yurmoq, ketmoq
+🔹 beschreiben \- tasvirlamoq
+🔸 einschalten \- yoqmoq
+🔹 geben \- bermoq
+🔸 holen \- olib kelmoq
+🔹 kontrollieren \- tekshirmoq
+🔸 mitnehmen \- o'zi bilan olib ketmoq
+🔹 stehen \- turmoq
+🔸 tragen \- kiyib yurmoq
+🔹 wissen \- bilmoq
+🔸 zeigen \- ko'rsatmoq
+🔹 zuhören \- tinglamoq
+🔸 blind \- ko'r
+🔹 grün \- yashil
+🔸 links \- chap
+🔹 rechts \- o'ng
+🔸 bald \- tez orada
+🔹 geradeaus \- to'g'ri
+🔸 hinter \- orqasida
+🔹 neben \- yonida
+🔸 vor \- oldida
+🔹 warum \- nega
+🔸 weg \- uzoq
+🔹 zuerst \- avval
+🔸 der Bahnhof \- vokzal
+🔹 die Bar \- bar
+🔸 die Disco \- diskoteka
+🔹 die Fabrik \- fabrika
+🔸 der Flughafen \- aeroport
+🔹 das Geschäft \- do'kon
+🔸 die Haltestelle \- bekat
+🔹 das Kino \- kino
+🔸 das Krankenhaus \- shifoxona
+🔹 der Park \- park
+🔸 der Parkplatz \- avtoturargoh
+🔹 das Schwimmbad \- suzish havzasi
+🔸 der Plan \- reja
+🔹 fremd \- begona
+🔸 die Badewanne \- vanna
+🔹 das Bett \- karavot
+🔸 die Dusche \- dush
+🔹 der Flur \- koridor
+🔸 der Herd \- gaz plitasi
+🔹 die Küche \- oshxona
+🔸 das Regal \- javon
+🔹 der Sessel \- kreslo
+🔸 das Sofa \- divan
+🔹 der Teppich \- gilam
+🔸 die Toilette \- hojatxona
+🔹 das Waschbecken \- rakovina
+🔸 die Waschmaschine \- kir yuvish mashinasi
+🔹 das Wohnzimmer \- yashash xonasi
+🔸 das Zimmer \- xona
+🔹 zurück \- orqaga
+🔸 der Boden \- pol
+🔹 die Brille \- ko'zoynak
+🔸 die Ecke \- burchak
+🔹 der Pass \- pasport
+🔸 der Schlüssel \- kalit
+🔹 die Tür \- eshik
+🔸 die Wand \- devor
+🔹 hängen \- osmoq
+🔸 liegen \- yotmoq
+🔹 an \- da/ustida
+🔸 über \- ustida
+🔹 unter \- tagida
+🔸 zwischen \- orasida""",
+
+    8: """🇩🇪 *A1 • MOTIVE • Lektion 8*
+
+🔸 der Einwohner \- aholi
+🔹 der Fluss \- daryo
+🔸 die Insel \- orol
+🔹 das Rathaus \- shahar hokimiyati
+🔸 der See \- ko'l
+🔹 die Sehenswürdigkeit \- diqqatga sazovor joy
+🔸 der Balkon \- balkon
+🔹 die Brücke \- ko'prik
+🔸 der Gruß \- salom
+🔹 das Kaufhaus \- universal do'kon
+🔸 das Zentrum \- markaz
+🔹 denken \- o'ylamoq
+🔸 direkt \- to'g'ridan\-to'g'ri
+🔹 lieb \- yoqimli
+🔸 besonders \- ayniqsa
+🔹 die Bibliothek \- kutubxona
+🔸 der Einkauf \- xarid
+🔹 der Sänger \- qo'shiqchi
+🔸 das Theater \- teatr
+🔹 die U\-Bahn \- metro
+🔸 fein \- nafis
+🔹 nachts \- tunda
+🔸 das Fundbüro \- yo'qolgan narsalar byurosi
+🔹 der Kursleiter \- kurs rahbari
+🔸 der Mechaniker \- mexanik
+🔹 ander \- boshqa
+🔸 kaputt \- buzilgan
+🔹 überall \- hamma joyda
+🔸 der Doktor \- doktor
+🔹 das Fieber \- isitma
+🔸 der Grad \- daraja
+🔹 der Kollege \- hamkasb
+🔸 die Kollegin \- hamkasb ayol
+🔹 der Schmerz \- og'riq
+🔸 der Zahn \- tish
+🔹 krank \- kasal
+🔸 der April \- aprel
+🔹 der August \- avgust
+🔸 der Dezember \- dekabr
+🔹 der Februar \- fevral
+🔸 das Gespräch \- suhbat
+🔹 der Januar \- yanvar
+🔸 der Juni \- iyun
+🔹 der Juli \- iyul
+🔸 der Mai \- may
+🔹 der März \- mart
+🔸 der Monat \- oy
+🔹 der November \- noyabr
+🔸 der Oktober \- oktyabr
+🔹 der September \- sentabr
+🔸 wiederholen \- takrorlamoq
+🔹 früher \- oldin
+🔸 später \- keyin
+🔹 besser \- yaxshiroq
+🔸 hoffentlich \- umid qilamanki
+🔹 natürlich \- albatta
+🔸 unbedingt \- shubhasiz
+🔹 das Bier \- pivo
+🔸 die Flasche \- shisha
+🔹 die Gesundheit \- sog'liq
+🔸 der Vorschlag \- taklif
+🔹 der Wein \- vino
+🔸 lachen \- kulmoq
+🔹 schlafen \- uxlamoq
+🔸 gesund \- sog'lom
+🔹 lang \- uzun
+🔸 modern \- zamonaviy
+🔹 verschieden \- turli
+🔸 weiß \- oq
+🔹 jeder \- har biri
+🔸 seit \- dan beri
+🔹 das Auge \- ko'z
+🔸 der Bauch \- qorin
+🔹 das Bein \- oyoq
+🔸 die Brust \- ko'krak
+🔹 der Finger \- barmoq
+🔸 der Fuß \- oyoq kafti
+🔹 das Gesicht \- yuz
+🔸 der Hals \- bo'yin
+🔹 die Hand \- qo'l
+🔸 der Kopf \- bosh
+🔹 der Körper \- tana
+🔸 der Mund \- og'iz
+🔹 die Nase \- burun
+🔸 das Ohr \- quloq
+🔹 der Rücken \- bel
+🔸 das Tier \- hayvon
+🔹 die Farbe \- rang
+🔸 der Frühling \- bahor
+🔹 der Herbst \- kuz
+🔸 die Kleidung \- kiyim
+🔹 der Sommer \- yoz
+🔸 der Winter \- qish
+🔹 kalt \- sovuq
+🔸 beide \- ikkala
+🔹 deshalb \- shuning uchun
+🔸 übrigens \- aytgancha
+🔹 blau \- ko'k
+🔸 braun \- jigar rang
+🔹 gelb \- sariq
+🔸 grau \- kulrang
+🔹 lila \- binafsha
+🔸 orange \- to'q sariq
+🔹 rosa \- pushti
+🔸 schwarz \- qora
+🔹 violett \- siyoh rang
+🔸 der Ausweis \- guvohnoma
+🔹 die Brieftasche \- hamyon
+🔸 die Kreditkarte \- kredit karta
+🔹 langsam \- sekin
+🔸 gestern \- kecha
+🔹 die Tasche \- sumka
+🔸 der Brief \- xat
+🔹 die Einladung \- taklifnoma
+🔸 die Fahrkarte \- yo'l chiptasi
+🔹 der Führerschein \- haydovchilik guvohnomasi
+🔸 das Fest \- bayram
+🔹 das Geschenk \- sovg'a
+🔸 der Zucker \- shakar
+🔹 fertig \- tayyor
+🔸 bitter \- achchiq
+🔹 schlimm \- yomon
+🔸 der Flug \- parvoz
+🔹 die Reise \- sayohat
+🔸 der Krimi \- detektiv
+🔹 die Kunst \- san'at
+🔸 die Mode \- moda
+🔹 die Politik \- siyosat
+🔸 erzählen \- hikoya qilmoq
+🔹 die Diskussion \- muhokama
+🔸 die Meinung \- fikr
+🔹 die Pause \- tanaffus
+🔸 die Regel \- qoida
+🔹 die Zeitung \- gazeta
+🔸 erlauben \- ruxsat bermoq
+🔹 fernsehen \- televizor ko'rmoq
+🔸 verboten \- taqiqlangan
+🔹 das Glück \- baxt
+🔸 das Verbot \- taqiq
+🔹 erlaubt \- ruxsat etilgan
+🔸 der Fasching \- karnaval
+🔹 der Hut \- shlyapa
+🔸 also \- demak
+🔹 anders \- boshqacha
+🔸 bis \- gacha
+🔹 ein paar \- bir necha
+🔸 das Neujahr \- Yangi yil
+🔹 das Silvester \- Yangi yil arafasi
+🔸 das Sonderangebot \- maxsus taklif
+🔹 das Weihnachten \- Rojdestvo
+🔸 gefallen \- yoqmoq
+🔹 gehören \- tegishli bo'lmoq
+🔸 das Hemd \- ko'ylak
+🔹 die Jacke \- kurtka
+🔸 die Jeans \- jinsi shim
+🔹 das Kleid \- ko'ylak
+🔸 der Mantel \- palto
+🔹 der Pullover \- jemper
+🔸 der Schuh \- tufli
+🔹 das T\-Shirt \- futbolka
+🔸 kurz \- qisqa
+🔹 das Hobby \- sevimli mashg'ulot
+🔸 welch \- qaysi
+🔹 der Rucksack \- ryukzak
+🔸 laufen \- yugurmoq
+🔹 schenken \- sovg'a qilmoq
+🔸 sitzen \- o'tirmoq
+🔹 danken \- minnatdorlik bildirmoq
+🔸 öffnen \- ochmoq
+🔹 sollen \- kerak bo'lmoq
+🔸 freundlich \- do'stona
+🔹 gemeinsam \- birgalikda
+🔸 die Hilfe \- yordam
+🔹 der Baum \- daraxt
+🔸 halten \- ushlamoq
+🔹 speichern \- saqlamoq
+🔸 die Kamera \- kamera
+🔹 ab \- dan boshlab""",
+}
+
+# Boshqa kitoblar uchun placeholder — keyinchalik to'ldirish mumkin
+def get_lektion_text(level: str, book: str, n: int) -> str:
+    """Lektion matnini qaytaradi"""
+    if level == "a1" and book == "motive":
+        text = A1_MOTIVE_LEKTIONS.get(n)
+        if text:
+            return text
+
+    # Boshqa barcha lektion va kitoblar uchun
+    label = BOOK_LABELS[book]
+    level_label = LEVEL_LABELS[level]
+    return (
+        f"{level_label} \\| {label}\n"
+        f"📖 *Lektion {n}*\n\n"
+        "⏳ Bu lektion materiallari tez orada qo'shiladi\\!\n\n"
+        "📌 Hozircha A1 Motive lektsiyalari to'liq mavjud\\."
+    )
 
 
 # ==================== KEYBOARD HELPERS ====================
@@ -121,20 +856,19 @@ def main_menu_keyboard():
 def level_select_keyboard():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("🟢 A1 - Beginner",        callback_data=CB.LEVEL_A1),
-            InlineKeyboardButton("🟢 A2 - Elementary",      callback_data=CB.LEVEL_A2),
+            InlineKeyboardButton("🟢 A1 - Beginner",      callback_data=CB.LEVEL_A1),
+            InlineKeyboardButton("🟢 A2 - Elementary",    callback_data=CB.LEVEL_A2),
         ],
         [
-            InlineKeyboardButton("🟡 B1 - Intermediate",    callback_data=CB.LEVEL_B1),
-            InlineKeyboardButton("🟡 B2 - Upper-Interm.",   callback_data=CB.LEVEL_B2),
+            InlineKeyboardButton("🟡 B1 - Intermediate",  callback_data=CB.LEVEL_B1),
+            InlineKeyboardButton("🟡 B2 - Upper-Interm.", callback_data=CB.LEVEL_B2),
         ],
-        [InlineKeyboardButton("🔴 C1 - Advanced",           callback_data=CB.LEVEL_C1)],
-        [InlineKeyboardButton("🏠 Asosiy menu",             callback_data=CB.MAIN_MENU)],
+        [InlineKeyboardButton("🔴 C1 - Advanced",         callback_data=CB.LEVEL_C1)],
+        [InlineKeyboardButton("🏠 Asosiy menu",           callback_data=CB.MAIN_MENU)],
     ])
 
 
 def books_keyboard(level: str):
-    """Daraja bo'yicha kitob tugmalari"""
     books = LEVEL_BOOKS[level]
     rows = []
     for book in books:
@@ -148,13 +882,11 @@ def books_keyboard(level: str):
 
 
 def lektions_keyboard(level: str, book: str):
-    """Lektion raqamlari tugmalari — 2 ustunli"""
     key = f"{level}_{book}"
     start, end = BOOK_LEKTIONS[key]
     nums = list(range(start, end + 1))
 
     rows = []
-    # 2 ta qator bo'yicha joylash
     for i in range(0, len(nums), 2):
         pair = nums[i:i+2]
         row = [
@@ -233,11 +965,10 @@ async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     return LEVEL_SELECT
 
 
-async def _show_books(query, level: str) -> int:
-    """Daraja tanlanganda kitoblarni ko'rsatish"""
+async def _show_books(query, level: str):
     label = LEVEL_LABELS[level]
     await query.edit_message_text(
-        f"{label}\n\nO'qimoqchi bo'lgan kitobni tanlang:",
+        f"{label}\n\nKitob tanlang:",
         parse_mode="MarkdownV2",
         reply_markup=books_keyboard(level),
     )
@@ -270,7 +1001,6 @@ async def level_c1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     await query.answer()
     return await _show_books(query, "c1")
 
-# Asosiy menyudan B1/B2/C1 prep tugmalari
 async def b1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -288,7 +1018,6 @@ async def c1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """book_{level}_{book} callback"""
     query = update.callback_query
     await query.answer()
     _, level, book = query.data.split("_", 2)
@@ -307,43 +1036,43 @@ async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
 
 async def back_book_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """back_book_{level} — kitoblar ro'yxatiga qaytish"""
     query = update.callback_query
     await query.answer()
-    # callback: back_book_a1, back_book_b2 etc
     level = query.data.split("_")[-1]
     return await _show_books(query, level)
 
 
 async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """lekt_{level}_{book}_{n} callback"""
+    """lekt_{level}_{book}_{n} callback — haqiqiy lug'atni ko'rsatadi"""
     query = update.callback_query
     await query.answer()
     parts = query.data.split("_")
-    # lekt_a1_motive_3  →  parts = ['lekt','a1','motive','3']
-    # lekt_b2_kompassdaf_5 → ['lekt','b2','kompassdaf','5']
+    # lekt_a1_motive_3  → ['lekt','a1','motive','3']
     level = parts[1]
-    n     = parts[-1]
-    book  = "_".join(parts[2:-1])   # kompassdaf yoki motive etc
+    n     = int(parts[-1])
+    book  = "_".join(parts[2:-1])
 
     label       = BOOK_LABELS[book]
     level_label = LEVEL_LABELS[level]
 
-    text = (
-        f"{level_label} \\| {label}\n"
-        f"📖 *Lektion {n}*\n\n"
-        "Bu lektion materiallari tez orada qo'shiladi\\!\n\n"
-        "📥 Yuklab olish: \\[Havola\\]\n"
-        "📝 Mashqlar: Tez orada"
-    )
-    # Kitobga qaytish tugmasi
+    # Haqiqiy lug'at matnini olish
+    content = get_lektion_text(level, book, n)
+
+    # Agar matn allaqachon sarlavhali bo'lsa (A1 Motive), shundayligicha yuboramiz
+    # Aks holda — sarlavha qo'shamiz
+    if content.startswith("🇩🇪"):
+        text = content
+    else:
+        text = f"{level_label} \\| {label}\n📖 *Lektion {n}*\n\n{content}"
+
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton(
-            "↩️ Kitobga qaytish",
-            callback_data=f"back_book_{level}"
+            "↩️ Lektsiyalarga qaytish",
+            callback_data=f"book_{level}_{book}"
         )],
         [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
     ])
+
     await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
     return BOOK_MENU
 
@@ -393,7 +1122,8 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "📚 *Darajalar:* A1, A2, B1, B2, C1\n"
         "📗 A1/A2/B1 \\— Motive, Schritte, Menschen\n"
         "📙 B2/C1 \\— Sicher, KompassDaF, Aspekte\n"
-        "🌐 Tarjimon \\— UZB↔DEU",
+        "🌐 Tarjimon \\— UZB↔DEU\n\n"
+        "✅ *Hozirda mavjud:* A1 Motive 1\\-8 lektsiyalar",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
@@ -419,28 +1149,24 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
-    # Shared handlers — barcha state larda ishlaydi
     common_handlers = [
-        CallbackQueryHandler(main_menu_handler,   pattern=f"^{CB.MAIN_MENU}$"),
+        CallbackQueryHandler(main_menu_handler,    pattern=f"^{CB.MAIN_MENU}$"),
         CallbackQueryHandler(level_select_handler, pattern=f"^{CB.LEVEL_SELECT}$"),
-        CallbackQueryHandler(level_a1_handler,    pattern=f"^{CB.LEVEL_A1}$"),
-        CallbackQueryHandler(level_a2_handler,    pattern=f"^{CB.LEVEL_A2}$"),
-        CallbackQueryHandler(level_b1_handler,    pattern=f"^{CB.LEVEL_B1}$"),
-        CallbackQueryHandler(level_b2_handler,    pattern=f"^{CB.LEVEL_B2}$"),
-        CallbackQueryHandler(level_c1_handler,    pattern=f"^{CB.LEVEL_C1}$"),
-        CallbackQueryHandler(b1_prep_handler,     pattern=f"^{CB.B1_PREP}$"),
-        CallbackQueryHandler(b2_prep_handler,     pattern=f"^{CB.B2_PREP}$"),
-        CallbackQueryHandler(c1_prep_handler,     pattern=f"^{CB.C1_PREP}$"),
-        CallbackQueryHandler(translator_handler,  pattern=f"^{CB.TRANSLATOR}$"),
-        CallbackQueryHandler(uzb_deu_handler,     pattern=f"^{CB.UZB_DEU}$"),
-        CallbackQueryHandler(deu_uzb_handler,     pattern=f"^{CB.DEU_UZB}$"),
-        CallbackQueryHandler(help_handler,        pattern=f"^{CB.HELP}$"),
-        # Kitob tanlash: book_a1_motive, book_b2_sicher, etc.
-        CallbackQueryHandler(book_select_handler, pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
-        # Kitobga qaytish: back_book_a1, etc.
-        CallbackQueryHandler(back_book_handler,   pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
-        # Lektion: lekt_a1_motive_3, lekt_b2_kompassdaf_5, etc.
-        CallbackQueryHandler(lektion_handler,     pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        CallbackQueryHandler(level_a1_handler,     pattern=f"^{CB.LEVEL_A1}$"),
+        CallbackQueryHandler(level_a2_handler,     pattern=f"^{CB.LEVEL_A2}$"),
+        CallbackQueryHandler(level_b1_handler,     pattern=f"^{CB.LEVEL_B1}$"),
+        CallbackQueryHandler(level_b2_handler,     pattern=f"^{CB.LEVEL_B2}$"),
+        CallbackQueryHandler(level_c1_handler,     pattern=f"^{CB.LEVEL_C1}$"),
+        CallbackQueryHandler(b1_prep_handler,      pattern=f"^{CB.B1_PREP}$"),
+        CallbackQueryHandler(b2_prep_handler,      pattern=f"^{CB.B2_PREP}$"),
+        CallbackQueryHandler(c1_prep_handler,      pattern=f"^{CB.C1_PREP}$"),
+        CallbackQueryHandler(translator_handler,   pattern=f"^{CB.TRANSLATOR}$"),
+        CallbackQueryHandler(uzb_deu_handler,      pattern=f"^{CB.UZB_DEU}$"),
+        CallbackQueryHandler(deu_uzb_handler,      pattern=f"^{CB.DEU_UZB}$"),
+        CallbackQueryHandler(help_handler,         pattern=f"^{CB.HELP}$"),
+        CallbackQueryHandler(book_select_handler,  pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
+        CallbackQueryHandler(back_book_handler,    pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
+        CallbackQueryHandler(lektion_handler,      pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
     ]
 
     conv_handler = ConversationHandler(
