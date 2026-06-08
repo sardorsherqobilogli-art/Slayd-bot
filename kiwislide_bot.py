@@ -1393,29 +1393,48 @@ def get_dictionary() -> dict:
 
 async def ai_translate(word: str, direction: str) -> str:
     """
-    Claude API orqali tarjima qiladi.
+    Groq API orqali tarjima qiladi (so'z va uzun gaplar uchun).
     direction: "uzb_deu" yoki "deu_uzb"
     """
-    if not ANTHROPIC_API_KEY:
-        return "❌ AI tarjimon sozlanmagan\\. ANTHROPIC\\_API\\_KEY kerak\\."
+    if not GROQ_API_KEY:
+        return "❌ AI tarjimon sozlanmagan\\. GROQ\\_API\\_KEY kerak\\."
+
+    # So'z yoki gap ekanini aniqlash (3 so'zdan ko'p bo'lsa — gap)
+    is_sentence = len(word.strip().split()) > 3
 
     if direction == "uzb_deu":
-        prompt = (
-            f"O'zbek tilidan nemis tiliga tarjima qil: \"{word}\"\n"
-            "Faqat tarjimani yoz, grammatik artikl (der/die/das) bilan birga. "
-            "Misol: \"kitob\" → \"das Buch\". "
-            "Hech qanday izoh, qo'shimcha matn yozma."
-        )
+        if is_sentence:
+            prompt = (
+                f"O'zbek tilidan nemis tiliga tarjima qil:\n\"{word}\"\n\n"
+                "Faqat tarjimani yoz. "
+                "To'liq, grammatik to'g'ri nemischa tarjima bo'lsin. "
+                "Hech qanday izoh, qo'shimcha matn yoki tirnoq yozma."
+            )
+        else:
+            prompt = (
+                f"O'zbek tilidan nemis tiliga tarjima qil: \"{word}\"\n"
+                "Faqat tarjimani yoz, grammatik artikl (der/die/das) bilan birga. "
+                "Misol: \"kitob\" → \"das Buch\". "
+                "Hech qanday izoh, qo'shimcha matn yozma."
+            )
     else:
-        prompt = (
-            f"Nemis tilidan o'zbek tiliga tarjima qil: \"{word}\"\n"
-            "Faqat tarjimani yoz. "
-            "Misol: \"das Buch\" → \"kitob\". "
-            "Hech qanday izoh, qo'shimcha matn yozma."
-        )
+        if is_sentence:
+            prompt = (
+                f"Nemis tilidan o'zbek tiliga tarjima qil:\n\"{word}\"\n\n"
+                "Faqat tarjimani yoz. "
+                "To'liq, tabiiy o'zbekcha tarjima bo'lsin. "
+                "Hech qanday izoh, qo'shimcha matn yoki tirnoq yozma."
+            )
+        else:
+            prompt = (
+                f"Nemis tilidan o'zbek tiliga tarjima qil: \"{word}\"\n"
+                "Faqat tarjimani yoz. "
+                "Misol: \"das Buch\" → \"kitob\". "
+                "Hech qanday izoh, qo'shimcha matn yozma."
+            )
 
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
                 "https://api.groq.com/openai/v1/chat/completions",
                 headers={
@@ -1424,7 +1443,7 @@ async def ai_translate(word: str, direction: str) -> str:
                 },
                 json={
                     "model": "llama-3.1-8b-instant",
-                    "max_tokens": 100,
+                    "max_tokens": 1024,
                     "messages": [{"role": "user", "content": prompt}],
                 },
             )
