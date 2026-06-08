@@ -27,7 +27,7 @@ from telegram.ext import (
 REPLY_KEYBOARD = ReplyKeyboardMarkup(
     [[KeyboardButton("📚 Menyu")]],
     resize_keyboard=True,
-    persistent=True,
+    is_persistent=True,
 )
 
 # ==================== KONFIGURATSIYA ====================
