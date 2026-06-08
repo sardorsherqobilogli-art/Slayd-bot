@@ -12,7 +12,7 @@ import random
 import datetime
 import json
 import httpx
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -21,6 +21,13 @@ from telegram.ext import (
     filters,
     ContextTypes,
     ConversationHandler,
+)
+
+# ==================== PASTKI DOIMIY MENYU ====================
+REPLY_KEYBOARD = ReplyKeyboardMarkup(
+    [[KeyboardButton("📚 Menyu")]],
+    resize_keyboard=True,
+    persistent=True,
 )
 
 # ==================== KONFIGURATSIYA ====================
@@ -1213,12 +1220,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring\\! 👇"
     )
     if update.message:
-        await update.message.reply_text(text, parse_mode="MarkdownV2",
-                                        reply_markup=main_menu_keyboard())
+        # Avval pastki doimiy menyu tugmasini o'rnat
+        await update.message.reply_text(
+            ".",
+            reply_markup=REPLY_KEYBOARD,
+        )
+        # Keyin asosiy inline menyu
+        await update.message.reply_text(
+            text,
+            parse_mode="MarkdownV2",
+            reply_markup=main_menu_keyboard(),
+        )
     elif update.callback_query:
         await update.callback_query.answer()
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2",
-                                                      reply_markup=main_menu_keyboard())
+        await update.callback_query.edit_message_text(
+            text,
+            parse_mode="MarkdownV2",
+            reply_markup=main_menu_keyboard(),
+        )
     return MAIN_MENU
 
 
@@ -1604,6 +1623,25 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 
+# ==================== PASTKI MENYU HANDLER ====================
+
+async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """'📚 Menyu' tugmasi bosilganda inline menyuni ko'rsatadi."""
+    text = (
+        "📋 *Buyruqlar:*\n\n"
+        "/start \\— Botni qayta boshlash\n"
+        "/menu \\— Asosiy menyu\n\n"
+        "📊 *Tez buyruqlar:*\n"
+        "• /start\n"
+        "• /menu"
+    )
+    await update.message.reply_text(
+        text,
+        parse_mode="MarkdownV2",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
 # ==================== MAIN ====================
 
 def main() -> None:
@@ -1670,6 +1708,9 @@ def main() -> None:
     application.add_handler(conv_handler)
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler
+    ))
 
     print("🤖 Bot ishga tushdi...")
     application.run_polling(allowed_updates=Update.ALL_TYPES)
