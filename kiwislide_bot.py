@@ -114,7 +114,7 @@ LEVEL_LABELS = {
 # ==================== A1 MOTIVE LUGATLARI ====================
 
 A1_MOTIVE_LEKTIONS = {
-    1: """🇩🇪 *A1 • MOTIVE • Lektion 1*
+    1: r"""🇩🇪 *A1 • MOTIVE • Lektion 1*
 
 🔸 der Buchstabe \- harf
 🔹 das Wiedersehen \- ko'rishguncha
@@ -253,7 +253,7 @@ A1_MOTIVE_LEKTIONS = {
 🔸 doch \- baribir
 🔹 kein \- hech qanday""",
 
-    2: """🇩🇪 *A1 • MOTIVE • Lektion 2*
+    2: r"""🇩🇪 *A1 • MOTIVE • Lektion 2*
 
 🔸 das Ausland \- chet el
 🔹 der/die Bekannte \- tanish
@@ -304,7 +304,7 @@ A1_MOTIVE_LEKTIONS = {
 🔸 Ihr \- sizning
 🔹 wie bitte \- uzr, nima dedingiz?""",
 
-    3: """🇩🇪 *A1 • MOTIVE • Lektion 3*
+    3: r"""🇩🇪 *A1 • MOTIVE • Lektion 3*
 
 🔸 der Beruf \- kasb
 🔹 der Bruder \- aka, uka
@@ -350,7 +350,7 @@ A1_MOTIVE_LEKTIONS = {
 🔹 viel \- ko'p
 🔸 wie viele \- nechta?""",
 
-    4: """🇩🇪 *A1 • MOTIVE • Lektion 4*
+    4: r"""🇩🇪 *A1 • MOTIVE • Lektion 4*
 
 🔸 die Arbeit \- ish
 🔹 der Arzt \- shifokor erkak
@@ -409,7 +409,7 @@ A1_MOTIVE_LEKTIONS = {
 🔸 die Touristin \- sayyoh ayol
 🔹 selbstständig \- mustaqil""",
 
-    5: """🇩🇪 *A1 • MOTIVE • Lektion 5*
+    5: r"""🇩🇪 *A1 • MOTIVE • Lektion 5*
 
 🔸 die Kommunikation \- kommunikatsiya
 🔹 der Konsum \- iste'mol
@@ -494,7 +494,7 @@ A1_MOTIVE_LEKTIONS = {
 🔸 vielleicht \- balki
 🔹 zusammen \- birga""",
 
-    6: """🇩🇪 *A1 • MOTIVE • Lektion 6*
+    6: r"""🇩🇪 *A1 • MOTIVE • Lektion 6*
 
 🔸 der Alltag \- kundalik hayot
 🔹 das Büro \- ofis
@@ -562,7 +562,7 @@ A1_MOTIVE_LEKTIONS = {
 🔹 fit \- baquvvat
 🔸 laut \- baland ovozli""",
 
-    7: """🇩🇪 *A1 • MOTIVE • Lektion 7*
+    7: r"""🇩🇪 *A1 • MOTIVE • Lektion 7*
 
 🔸 einladen \- taklif qilmoq
 🔹 die Ampel \- svetofor
@@ -644,7 +644,7 @@ A1_MOTIVE_LEKTIONS = {
 🔹 unter \- tagida
 🔸 zwischen \- orasida""",
 
-    8: """🇩🇪 *A1 • MOTIVE • Lektion 8*
+    8: r"""🇩🇪 *A1 • MOTIVE • Lektion 8*
 
 🔸 der Einwohner \- aholi
 🔹 der Fluss \- daryo
@@ -916,29 +916,21 @@ async def show_quiz_card(query, context):
         book  = q["book"]
         n     = q["n"]
 
+        def esc_result(s):
+            for ch in r"\_*[]()~`>#+-=|{}.!":
+                s = s.replace(ch, f"\\{ch}")
+            return s
+
         wrong_text = ""
         if wrong:
-            wrong_lines = "\n".join([f"• {g} — {u}" for g, u in wrong])
+            wrong_lines = "\n".join([f"• {esc_result(g)} — {esc_result(u)}" for g, u in wrong])
             wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
 
         text = (
             f"🏁 *Test tugadi\\!*\n\n"
             f"✅ Bildim: {correct}/{total}\n"
             f"❌ Bilmadim: {len(wrong)}/{total}"
-           wrong_text = ""
-if wrong:
-    wrong_lines = "\n".join([f"• {g} — {u}" for g, u in wrong])
-    # Barcha maxsus belgilarni escape qilamiz
-    for ch in r"_*[]()~`>#+-=|{}.!":
-        wrong_lines = wrong_lines.replace(ch, f"\\{ch}")
-    wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
-
-text = (
-    f"🏁 *Test tugadi\\!*\n\n"
-    f"✅ Bildim: {correct}/{total}\n"
-    f"❌ Bilmadim: {len(wrong)}/{total}"
-    + wrong_text
-)
+            + wrong_text
         )
         await query.edit_message_text(
             text,
@@ -1204,13 +1196,13 @@ def translator_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = (
-       "🎉 *Sprechen mit Spaß! Willkommen!* 🇩🇪\n\n"
-        "Siz oddiy botga emas, nemis tilini **raketa tezligida** o'rgatuvchi shaxsiy murabbiyingiz safiga qo'shildingiz! 🚀\n\n"
+        "🎉 *Sprechen mit Spaß\\! Willkommen\\!* 🇩🇪\n\n"
+        "Siz oddiy botga emas, nemis tilini *raketa tezligida* o'rgatuvchi shaxsiy murabbiyingiz safiga qo'shildingiz\\! 🚀\n\n"
         "✨ *Bu yerda sizni nimalar kutmoqda:*\n"
-        "• Har kuni atigi 15 daqiqada yangi daraja! 🔥\n"
-        "• Miyani charchatmaydigan intellektual Quiz testlar! 🧠\n"
-        "• Fokusni 100% ga oshiruvchi Pomodoro taymer! 🍅\n\n"
-        "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring! 👇"
+        "• Har kuni atigi 15 daqiqada yangi daraja\\! 🔥\n"
+        "• Miyani charchatmaydigan intellektual Quiz testlar\\! 🧠\n"
+        "• Fokusni 100% ga oshiruvchi Pomodoro taymer\\! 🍅\n\n"
+        "Tayyormisiz? Maqsadni tanlang va g'alaba sari yuring\\! 👇"
     )
     if update.message:
         await update.message.reply_text(text, parse_mode="MarkdownV2",
@@ -1483,6 +1475,8 @@ def main() -> None:
             CommandHandler("menu",  menu_command),
             CommandHandler("help",  help_command),
         ],
+        per_message=False,
+        allow_reentry=True,
     )
 
     application.add_handler(conv_handler)
