@@ -925,7 +925,20 @@ async def show_quiz_card(query, context):
             f"🏁 *Test tugadi\\!*\n\n"
             f"✅ Bildim: {correct}/{total}\n"
             f"❌ Bilmadim: {len(wrong)}/{total}"
-            + wrong_text.replace("-", "\\-").replace("(", "\\(").replace(")", "\\)").replace(".", "\\.").replace("!", "\\!")
+           wrong_text = ""
+if wrong:
+    wrong_lines = "\n".join([f"• {g} — {u}" for g, u in wrong])
+    # Barcha maxsus belgilarni escape qilamiz
+    for ch in r"_*[]()~`>#+-=|{}.!":
+        wrong_lines = wrong_lines.replace(ch, f"\\{ch}")
+    wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
+
+text = (
+    f"🏁 *Test tugadi\\!*\n\n"
+    f"✅ Bildim: {correct}/{total}\n"
+    f"❌ Bilmadim: {len(wrong)}/{total}"
+    + wrong_text
+)
         )
         await query.edit_message_text(
             text,
