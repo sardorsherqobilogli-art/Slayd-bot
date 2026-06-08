@@ -10,17 +10,22 @@ import logging
 import os
 import random
 import datetime
+import json
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
     ContextTypes,
     ConversationHandler,
 )
 
 # ==================== KONFIGURATSIYA ====================
 TOKEN = os.environ.get("BOT_TOKEN", "SIZNING_BOT_TOKENINGIZ")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
@@ -37,7 +42,9 @@ logger = logging.getLogger(__name__)
     TRANSLATOR,
     QUIZ_STATE,
     POMODORO_STATE,
-) = range(12)
+    UZB_DEU_INPUT,
+    DEU_UZB_INPUT,
+) = range(14)
 
 # ==================== CALLBACKS ====================
 class CB:
@@ -54,6 +61,7 @@ class CB:
     TRANSLATOR    = "translator"
     UZB_DEU       = "uzb_deu"
     DEU_UZB       = "deu_uzb"
+    TRANSLATOR_AGAIN = "translator_again"
     HELP          = "help"
     QUIZ_KNOW     = "quiz_know"
     QUIZ_DONTKNOW = "quiz_dontknow"
@@ -1357,6 +1365,118 @@ async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 # ==================== TARJIMON ====================
 
+def build_dictionary() -> dict:
+    """
+    Barcha lug'atlardan ikki tomonlama qidiruv lug'atini yaratadi.
+    { "de_uz": {"der buchstabe": "harf", ...},
+      "uz_de": {"harf": "der Buchstabe", ...} }
+    """
+    de_uz = {}
+    uz_de = {}
+    for level in ["a1"]:
+        for book in ["motive"]:
+            for n in range(1, 9):
+                for german, uzbek in parse_words(level, book, n):
+                    de_uz[german.lower()] = (german, uzbek)
+                    uz_de[uzbek.lower()] = (german, uzbek)
+    return {"de_uz": de_uz, "uz_de": uz_de}
+
+# Global lug'at — bot ishga tushganda bir marta quriladi
+_DICTIONARY: dict | None = None
+
+def get_dictionary() -> dict:
+    global _DICTIONARY
+    if _DICTIONARY is None:
+        _DICTIONARY = build_dictionary()
+    return _DICTIONARY
+
+
+async def ai_translate(word: str, direction: str) -> str:
+    """
+    Claude API orqali tarjima qiladi.
+    direction: "uzb_deu" yoki "deu_uzb"
+    """
+    if not ANTHROPIC_API_KEY:
+        return "❌ AI tarjimon sozlanmagan\\. ANTHROPIC\\_API\\_KEY kerak\\."
+
+    if direction == "uzb_deu":
+        prompt = (
+            f"O'zbek tilidan nemis tiliga tarjima qil: \"{word}\"\n"
+            "Faqat tarjimani yoz, grammatik artikl (der/die/das) bilan birga. "
+            "Misol: \"kitob\" → \"das Buch\". "
+            "Hech qanday izoh, qo'shimcha matn yozma."
+        )
+    else:
+        prompt = (
+            f"Nemis tilidan o'zbek tiliga tarjima qil: \"{word}\"\n"
+            "Faqat tarjimani yoz. "
+            "Misol: \"das Buch\" → \"kitob\". "
+            "Hech qanday izoh, qo'shimcha matn yozma."
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "max_tokens": 100,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+        data = resp.json()
+        result = data["choices"][0]["message"]["content"].strip()
+        return result
+    except Exception as e:
+        logger.error(f"AI tarjima xatosi: {e}")
+        return "❌ AI tarjimada xato yuz berdi\\. Qayta urinib ko'ring\\."
+
+
+def esc_md(text: str) -> str:
+    """MarkdownV2 uchun barcha maxsus belgilarni escape qiladi."""
+    for ch in r"\_*[]()~`>#+-=|{}.!":
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
+
+async def do_translate(word: str, direction: str) -> str:
+    """
+    Avval lug'atdan qidiradi, topilmasa AI ga murojaat qiladi.
+    Tayyor MarkdownV2 matnini qaytaradi.
+    """
+    d = get_dictionary()
+    key = word.strip().lower()
+
+    if direction == "uzb_deu":
+        flag_from, flag_to = "🇺🇿", "🇩🇪"
+        label = "O'zbekcha → Nemischa"
+        hit = d["uz_de"].get(key)
+    else:
+        flag_from, flag_to = "🇩🇪", "🇺🇿"
+        label = "Nemischa → O'zbekcha"
+        hit = d["de_uz"].get(key)
+
+    header = f"{flag_from}➡️{flag_to} *{esc_md(label)}*\n\n"
+    word_line = f"📝 So'z: *{esc_md(word)}*\n\n"
+
+    if hit:
+        german, uzbek = hit
+        if direction == "uzb_deu":
+            result_line = f"✅ *Lug'atdan:* {esc_md(german)}"
+        else:
+            result_line = f"✅ *Lug'atdan:* {esc_md(uzbek)}"
+        return header + word_line + result_line
+    else:
+        # AI dan tarjima
+        ai_result = await ai_translate(word, direction)
+        ai_safe = esc_md(ai_result)
+        return header + word_line + f"🤖 *AI tarjima:* {ai_safe}"
+
+
 async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -1367,25 +1487,68 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
     return TRANSLATOR
 
+
 async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    context.user_data["translator_dir"] = "uzb_deu"
     await query.edit_message_text(
-        "🇺🇿➡️🇩🇪 *O'zbekcha → Nemischa*\n\nTarjima qilmoqchi bo'lgan so'zni yuboring:",
+        "🇺🇿➡️🇩🇪 *O'zbekcha → Nemischa*\n\n"
+        "Tarjima qilmoqchi bo'lgan so'z yoki iborani yuboring:",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
-    return MAIN_MENU
+    return UZB_DEU_INPUT
+
 
 async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    context.user_data["translator_dir"] = "deu_uzb"
     await query.edit_message_text(
-        "🇩🇪➡️🇺🇿 *Nemischa → O'zbekcha*\n\nTarjima qilmoqchi bo'lgan so'zni yuboring:",
+        "🇩🇪➡️🇺🇿 *Nemischa → O'zbekcha*\n\n"
+        "Tarjima qilmoqchi bo'lgan so'z yoki iborani yuboring:",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
-    return MAIN_MENU
+    return DEU_UZB_INPUT
+
+
+def translator_result_keyboard(direction: str) -> InlineKeyboardMarkup:
+    """Tarjima natijasi ostida ko'rsatiladigan tugmalar."""
+    other = "deu_uzb" if direction == "uzb_deu" else "uzb_deu"
+    other_label = "🇩🇪➡️🇺🇿 Nemischa→O'zbek" if direction == "uzb_deu" else "🇺🇿➡️🇩🇪 O'zbek→Nemis"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Yana tarjima", callback_data=CB.UZB_DEU if direction == "uzb_deu" else CB.DEU_UZB)],
+        [InlineKeyboardButton(other_label, callback_data=CB.DEU_UZB if direction == "uzb_deu" else CB.UZB_DEU)],
+        [InlineKeyboardButton("🌐 Tarjimon", callback_data=CB.TRANSLATOR)],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+
+async def translation_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Foydalanuvchi so'z yuborgan paytda chaqiriladi."""
+    word = update.message.text.strip()
+    if not word:
+        await update.message.reply_text("❗ Iltimos so'z yuboring\\.", parse_mode="MarkdownV2")
+        return context.user_data.get("translator_state", UZB_DEU_INPUT)
+
+    direction = context.user_data.get("translator_dir", "uzb_deu")
+
+    # Yuklanmoqda...
+    loading_msg = await update.message.reply_text("⏳ Tarjima qilinmoqda\\.\\.\\.", parse_mode="MarkdownV2")
+
+    result_text = await do_translate(word, direction)
+
+    await loading_msg.delete()
+    await update.message.reply_text(
+        result_text,
+        parse_mode="MarkdownV2",
+        reply_markup=translator_result_keyboard(direction),
+    )
+
+    # Xuddi shu yo'nalishda davom etish uchun state saqlanadi
+    return UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
 
 
 # ==================== YORDAM ====================
@@ -1469,6 +1632,12 @@ def main() -> None:
             TRANSLATOR:   common_handlers,
             QUIZ_STATE:   common_handlers,
             POMODORO_STATE: common_handlers,
+            UZB_DEU_INPUT: common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+            ],
+            DEU_UZB_INPUT: common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+            ],
         },
         fallbacks=[
             CommandHandler("start", start),
