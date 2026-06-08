@@ -1,1 +1,1 @@
-worker: python deutsch_bot.py
+worker: python kiwislide_bot.py
