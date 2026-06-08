@@ -11,6 +11,7 @@ import os
 import random
 import datetime
 import json
+import tempfile
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import (
@@ -51,7 +52,8 @@ logger = logging.getLogger(__name__)
     POMODORO_STATE,
     UZB_DEU_INPUT,
     DEU_UZB_INPUT,
-) = range(14)
+    VOICE_CHAT,
+) = range(15)
 
 # ==================== CALLBACKS ====================
 class CB:
@@ -75,6 +77,8 @@ class CB:
     QUIZ_REPEAT   = "quiz_repeat"
     POMODORO_25   = "pomodoro_25"
     POMODORO_STOP = "pomodoro_stop"
+    VOICE_CHAT    = "voice_chat"
+    VOICE_HINTS   = "voice_hints"
 
 
 # ==================== LEKTION RANGE CONFIG ====================
@@ -1134,6 +1138,7 @@ def main_menu_keyboard():
             InlineKeyboardButton("📕 C1 Vorbereitung", callback_data=CB.C1_PREP),
             InlineKeyboardButton("🌐 Tarjimon",         callback_data=CB.TRANSLATOR),
         ],
+        [InlineKeyboardButton("🎙️ Ovozli suhbat (AI)", callback_data=CB.VOICE_CHAT)],
         [InlineKeyboardButton("ℹ️ Yordam", callback_data=CB.HELP)],
     ])
 
@@ -1588,6 +1593,258 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
     return UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
 
 
+# ==================== OVOZLI SUHBAT (AI) ====================
+
+async def voice_chat_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Ovozli suhbat menyusini ko'rsatadi."""
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "🎙️ *Ovozli AI Suhbat*\n\n"
+        "Nemis tilida gapiring — men eshitaman\\!\n\n"
+        "✅ Grammatik xatolarni to'g'irlayman\n"
+        "💡 O'zbekcha izoh beraman\n"
+        "🔊 Ovozli javob yuboraman\n\n"
+        "Ovozli xabar yuboring 👇",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("💡 Nima desam ekan?", callback_data=CB.VOICE_HINTS)],
+            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+        ]),
+    )
+    context.user_data["chat_history"] = []
+    return VOICE_CHAT
+
+
+async def groq_stt(audio_path: str) -> str:
+    """Groq Whisper orqali ovozni nemis matniga aylantirish."""
+    if not GROQ_API_KEY:
+        return ""
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            with open(audio_path, "rb") as f:
+                resp = await client.post(
+                    "https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                    files={"file": (os.path.basename(audio_path), f, "audio/ogg")},
+                    data={"model": "whisper-large-v3", "language": "de"},
+                )
+        data = resp.json()
+        return data.get("text", "").strip()
+    except Exception as e:
+        logger.error(f"STT xatosi: {e}")
+        return ""
+
+
+async def analyze_german_speech(user_text: str) -> dict:
+    """Groq LLM orqali nemis tilini tahlil qilish."""
+    prompt = f"""Siz professional nemis tili o'qituvchisisiz. O'quvchi quyidagi gapni aytdi:
+
+"{user_text}"
+
+Quyidagi AYNAN shu formatda javob bering (boshqa hech narsa yozmasangiz):
+TO'G'RI: [agar xato bo'lsa to'g'ri variant, bo'lmasa faqat: OK]
+IZOH: [xato haqida qisqa izoh O'ZBEK TILIDA, yoki: Ajoyib!]
+JAVOB: [suhbatni davom ettirish uchun keyingi savol FAQAT NEMIS TILIDA]"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.3,
+                    "max_tokens": 300,
+                },
+            )
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+
+        corrected = ""
+        explanation = ""
+        next_question = ""
+
+        for line in content.split("\n"):
+            line = line.strip()
+            if line.startswith("TO'G'RI:"):
+                corrected = line.replace("TO'G'RI:", "").strip()
+            elif line.startswith("IZOH:"):
+                explanation = line.replace("IZOH:", "").strip()
+            elif line.startswith("JAVOB:"):
+                next_question = line.replace("JAVOB:", "").strip()
+
+        return {
+            "original": user_text,
+            "corrected": corrected,
+            "explanation": explanation,
+            "next_question": next_question or "Was möchtest du noch besprechen?",
+        }
+    except Exception as e:
+        logger.error(f"Tahlil xatosi: {e}")
+        return {
+            "original": user_text,
+            "corrected": "",
+            "explanation": "Tahlil qilishda xatolik.",
+            "next_question": "Kannst du das wiederholen?",
+        }
+
+
+async def edge_tts_speak(text: str, output_path: str):
+    """Microsoft Edge TTS orqali bepul nemis ovozi yaratish."""
+    try:
+        import edge_tts
+        communicate = edge_tts.Communicate(text, voice="de-DE-KatjaNeural")
+        await communicate.save(output_path)
+        return True
+    except Exception as e:
+        logger.error(f"TTS xatosi: {e}")
+        return False
+
+
+async def voice_hints_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """'Nima desam ekan?' tugmasi - AI 2 ta javob varianti beradi."""
+    query = update.callback_query
+    await query.answer()
+
+    history = context.user_data.get("chat_history", [])
+    history_text = "\n".join(history[-4:]) if history else "Suhbat endigina boshlandi."
+
+    prompt = f"""O'quvchi nemis tilida suhbatlashmoqda, nima deyishini bilmayapti.
+Oxirgi suhbat: {history_text}
+
+2 ta TAYYOR JAVOB varianti ber (nemis tilida):
+VARIANT 1: [oddiy variant]
+TARJIMA 1: [o'zbekcha]
+VARIANT 2: [murakkabroq variant]
+TARJIMA 2: [o'zbekcha]"""
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": "llama-3.1-8b-instant",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": 0.5,
+                    "max_tokens": 200,
+                },
+            )
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+
+        msg = "💡 *Nima desam ekan?*\n\n" + esc_md(content)
+    except Exception as e:
+        logger.error(f"Hints xatosi: {e}")
+        msg = "💡 *Namunalar:*\n\nVariant 1: Ich verstehe das nicht\\. \\(Tushunmadim\\.\\)\nVariant 2: Könnten Sie das bitte wiederholen? \\(Qaytara olasizmi?\\)"
+
+    await query.edit_message_text(
+        msg,
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("💡 Yana variantlar", callback_data=CB.VOICE_HINTS)],
+            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+        ]),
+    )
+    return VOICE_CHAT
+
+
+async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Foydalanuvchi ovoz yuborganida ishlaydi."""
+    processing_msg = await update.message.reply_text("🎙️ Ovozingiz tahlil qilinmoqda...")
+
+    voice_path = None
+    tts_path = None
+
+    try:
+        # 1. Ovoz faylini yuklab olish
+        voice = update.message.voice
+        file = await context.bot.get_file(voice.file_id)
+
+        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
+            await file.download_to_drive(tmp.name)
+            voice_path = tmp.name
+
+        # 2. STT: Ovoz → Matn (Groq Whisper)
+        transcript = await groq_stt(voice_path)
+        if not transcript:
+            await processing_msg.edit_text("❌ Ovozni tanib bo'lmadi. Qayta urinib ko'ring.")
+            return VOICE_CHAT
+
+        # Suhbat tarixini saqlash
+        history = context.user_data.get("chat_history", [])
+        history.append(f"Foydalanuvchi: {transcript}")
+        context.user_data["chat_history"] = history[-10:]
+
+        # 3. AI Tahlil
+        analysis = await analyze_german_speech(transcript)
+
+        # 4. Matnli javob tayyorlash
+        parts = [f"📝 *Siz aytdingiz:*\n{esc_md(transcript)}"]
+
+        is_correct = not analysis["corrected"] or analysis["corrected"].upper() == "OK"
+
+        if not is_correct and analysis["corrected"]:
+            parts.append(f"🎯 *To'g'rilash:*\n{esc_md(analysis['corrected'])}")
+
+        if analysis["explanation"] and analysis["explanation"].lower() != "ajoyib!":
+            parts.append(f"💡 *Izoh:*\n{esc_md(analysis['explanation'])}")
+        elif is_correct:
+            parts.append("✅ *Ajoyib\\! Hech qanday xato yo'q\\!*")
+
+        if analysis["next_question"]:
+            parts.append(f"🤖 *Bot javobi:*\n{esc_md(analysis['next_question'])}")
+            history.append(f"Bot: {analysis['next_question']}")
+            context.user_data["chat_history"] = history[-10:]
+
+        text_response = "\n\n".join(parts)
+
+        # 5. TTS: Javobni ovozga aylantirish
+        tts_success = False
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tts_tmp:
+            tts_path = tts_tmp.name
+
+        if analysis["next_question"]:
+            tts_success = await edge_tts_speak(analysis["next_question"], tts_path)
+
+        # 6. Natijalarni yuborish
+        await processing_msg.delete()
+
+        await update.message.reply_text(
+            text_response,
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("💡 Nima desam ekan?", callback_data=CB.VOICE_HINTS)],
+                [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+            ]),
+        )
+
+        # Ovozli javob
+        if tts_success and os.path.exists(tts_path) and os.path.getsize(tts_path) > 0:
+            with open(tts_path, "rb") as voice_file:
+                await update.message.reply_voice(voice=voice_file)
+
+    except Exception as e:
+        logger.error(f"Voice handler xatosi: {e}")
+        await processing_msg.edit_text("❌ Xatolik yuz berdi. Qayta urinib ko'ring.")
+
+    finally:
+        if voice_path and os.path.exists(voice_path):
+            os.remove(voice_path)
+        if tts_path and os.path.exists(tts_path):
+            os.remove(tts_path)
+
+    return VOICE_CHAT
+
+
 # ==================== YORDAM ====================
 
 async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1664,6 +1921,8 @@ def main() -> None:
         CallbackQueryHandler(uzb_deu_handler,      pattern=f"^{CB.UZB_DEU}$"),
         CallbackQueryHandler(deu_uzb_handler,      pattern=f"^{CB.DEU_UZB}$"),
         CallbackQueryHandler(help_handler,         pattern=f"^{CB.HELP}$"),
+        CallbackQueryHandler(voice_chat_menu_handler, pattern=f"^{CB.VOICE_CHAT}$"),
+        CallbackQueryHandler(voice_hints_handler,     pattern=f"^{CB.VOICE_HINTS}$"),
         CallbackQueryHandler(book_select_handler,  pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
         CallbackQueryHandler(back_book_handler,    pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
         CallbackQueryHandler(lektion_handler,      pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
@@ -1693,9 +1952,14 @@ def main() -> None:
             POMODORO_STATE: common_handlers,
             UZB_DEU_INPUT: common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+                MessageHandler(filters.VOICE, voice_message_handler),
             ],
             DEU_UZB_INPUT: common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+                MessageHandler(filters.VOICE, voice_message_handler),
+            ],
+            VOICE_CHAT: common_handlers + [
+                MessageHandler(filters.VOICE, voice_message_handler),
             ],
         },
         fallbacks=[
