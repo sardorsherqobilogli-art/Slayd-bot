@@ -1191,7 +1191,7 @@ def translator_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = (
-        "👋 *Deutsch Booster* ga xush kelibsiz\\!\n\n"
+        "👋 *Sprechen mit Spaß* ga xush kelibsiz\\!\n\n"
         "🇩🇪 Nemis tilini A1 dan C1 gacha o'rganing\\.\n"
         "📚 Bo'limni tanlang:"
     )
