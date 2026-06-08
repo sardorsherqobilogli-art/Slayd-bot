@@ -1937,18 +1937,22 @@ def main() -> None:
     ]
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+            CallbackQueryHandler(voice_chat_menu_handler, pattern=f"^{CB.VOICE_CHAT}$"),
+        ],
         states={
-            MAIN_MENU:    common_handlers,
-            LEVEL_SELECT: common_handlers,
-            A1_MENU:      common_handlers,
-            A2_MENU:      common_handlers,
-            B1_MENU:      common_handlers,
-            B2_MENU:      common_handlers,
-            C1_MENU:      common_handlers,
-            BOOK_MENU:    common_handlers,
-            TRANSLATOR:   common_handlers,
-            QUIZ_STATE:   common_handlers,
+            MAIN_MENU:      common_handlers,
+            LEVEL_SELECT:   common_handlers,
+            A1_MENU:        common_handlers,
+            A2_MENU:        common_handlers,
+            B1_MENU:        common_handlers,
+            B2_MENU:        common_handlers,
+            C1_MENU:        common_handlers,
+            BOOK_MENU:      common_handlers,
+            LEKTION_PAGE:   common_handlers,
+            TRANSLATOR:     common_handlers,
+            QUIZ_STATE:     common_handlers,
             POMODORO_STATE: common_handlers,
             UZB_DEU_INPUT: common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
