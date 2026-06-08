@@ -1513,7 +1513,7 @@ async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "uzb_deu"
     await query.edit_message_text(
         "🇺🇿➡️🇩🇪 *O'zbekcha → Nemischa*\n\n"
-        "Tarjima qilmoqchi bo'lgan so'z yoki iborani yuboring:",
+        "Menga xohlagan tarjima qilmoqchi bo'lgan so'zlarni yoki matnlarni yuboring! ⚡",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
@@ -1526,7 +1526,7 @@ async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "deu_uzb"
     await query.edit_message_text(
         "🇩🇪➡️🇺🇿 *Nemischa → O'zbekcha*\n\n"
-        "Tarjima qilmoqchi bo'lgan so'z yoki iborani yuboring:",
+        "Menga xohlagan tarjima qilmoqchi bo'lgan so'zlarni yoki matnlarni yuboring! ⚡",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
