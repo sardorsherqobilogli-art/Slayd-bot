@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-KIWI - Telegram Bot
+Deutsch Booster - Telegram Bot
 python-telegram-bot v20+
 Railway: BOT_TOKEN environment variable kerak
 """
 
 import logging
 import os
+import random
+import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -33,7 +35,9 @@ logger = logging.getLogger(__name__)
     BOOK_MENU,
     LEKTION_PAGE,
     TRANSLATOR,
-) = range(10)
+    QUIZ_STATE,
+    POMODORO_STATE,
+) = range(12)
 
 # ==================== CALLBACKS ====================
 class CB:
@@ -51,6 +55,11 @@ class CB:
     UZB_DEU       = "uzb_deu"
     DEU_UZB       = "deu_uzb"
     HELP          = "help"
+    QUIZ_KNOW     = "quiz_know"
+    QUIZ_DONTKNOW = "quiz_dontknow"
+    QUIZ_REPEAT   = "quiz_repeat"
+    POMODORO_25   = "pomodoro_25"
+    POMODORO_STOP = "pomodoro_stop"
 
 
 # ==================== LEKTION RANGE CONFIG ====================
@@ -836,6 +845,262 @@ def get_lektion_text(level: str, book: str, n: int) -> str:
     )
 
 
+def parse_words(level: str, book: str, n: int) -> list:
+    """Lug'at matnidan (german, uzbek) juftliklarini oladi"""
+    if level == "a1" and book == "motive":
+        raw = A1_MOTIVE_LEKTIONS.get(n, "")
+    else:
+        return []
+
+    words = []
+    for line in raw.split("\n"):
+        line = line.strip()
+        # Emoji va backslash larni tozalash
+        for emoji in ["🔸", "🔹"]:
+            line = line.replace(emoji, "").strip()
+        # "der Buchstabe \- harf" shaklini ajratamiz
+        if " \\- " in line:
+            parts = line.split(" \\- ", 1)
+            if len(parts) == 2:
+                german = parts[0].strip()
+                uzbek = parts[1].strip()
+                if german and uzbek:
+                    words.append((german, uzbek))
+    return words
+
+
+# ==================== QUIZ HELPERS ====================
+
+def get_quiz_state(context) -> dict:
+    return context.user_data.get("quiz", {})
+
+def set_quiz_state(context, data: dict):
+    context.user_data["quiz"] = data
+
+def quiz_card_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Bildim", callback_data=CB.QUIZ_KNOW),
+            InlineKeyboardButton("❌ Bilmadim", callback_data=CB.QUIZ_DONTKNOW),
+        ],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+def quiz_result_keyboard(level: str, book: str, n: int, has_wrong: bool):
+    rows = []
+    if has_wrong:
+        rows.append([InlineKeyboardButton(
+            "🔁 Bilmaganlarni takrorlash", callback_data=CB.QUIZ_REPEAT
+        )])
+    rows.append([InlineKeyboardButton(
+        "↩️ Lektsiyaga qaytish",
+        callback_data=f"lekt_{level}_{book}_{n}"
+    )])
+    rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
+    return InlineKeyboardMarkup(rows)
+
+
+async def show_quiz_card(query, context):
+    """Navbatdagi flashcard kartani ko'rsatadi"""
+    q = get_quiz_state(context)
+    words = q["words"]
+    idx = q["index"]
+
+    if idx >= len(words):
+        # Test tugadi
+        wrong = q["wrong"]
+        total = q["total"]
+        correct = total - len(wrong)
+
+        level = q["level"]
+        book  = q["book"]
+        n     = q["n"]
+
+        wrong_text = ""
+        if wrong:
+            wrong_lines = "\n".join([f"• {g} — {u}" for g, u in wrong])
+            wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
+
+        text = (
+            f"🏁 *Test tugadi\\!*\n\n"
+            f"✅ Bildim: {correct}/{total}\n"
+            f"❌ Bilmadim: {len(wrong)}/{total}"
+            + wrong_text.replace("-", "\\-").replace("(", "\\(").replace(")", "\\)").replace(".", "\\.").replace("!", "\\!")
+        )
+        await query.edit_message_text(
+            text,
+            parse_mode="MarkdownV2",
+            reply_markup=quiz_result_keyboard(level, book, n, bool(wrong))
+        )
+        return QUIZ_STATE
+
+    german, uzbek = words[idx]
+    total = q["total"]
+    # MarkdownV2 uchun xavfli belgilarni escape qilamiz
+    def esc(s):
+        for ch in r"\_*[]()~`>#+-=|{}.!":
+            s = s.replace(ch, f"\\{ch}")
+        return s
+
+    text = (
+        f"🧠 *Yodlash testi* \\— {idx+1}/{total}\n\n"
+        f"🇩🇪 *{esc(german)}*\n\n"
+        f"O'zbekcha tarjimasi qanday?"
+    )
+    await query.edit_message_text(
+        text,
+        parse_mode="MarkdownV2",
+        reply_markup=quiz_card_keyboard()
+    )
+    return QUIZ_STATE
+
+
+async def quiz_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """quiz_start_{level}_{book}_{n} callback"""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split("_")
+    # quiz_start_a1_motive_1 → ['quiz','start','a1','motive','1']
+    level = parts[2]
+    n     = int(parts[-1])
+    book  = "_".join(parts[3:-1])
+
+    words = parse_words(level, book, n)
+    if not words:
+        await query.edit_message_text(
+            "⏳ Bu lektion uchun test hali mavjud emas\\.",
+            parse_mode="MarkdownV2",
+            reply_markup=back_to_main_keyboard()
+        )
+        return BOOK_MENU
+
+    random.shuffle(words)
+
+    set_quiz_state(context, {
+        "words": words,
+        "index": 0,
+        "wrong": [],
+        "total": len(words),
+        "level": level,
+        "book": book,
+        "n": n,
+    })
+    return await show_quiz_card(query, context)
+
+
+async def quiz_know_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer("✅ Zo'r!")
+    q = get_quiz_state(context)
+    q["index"] += 1
+    set_quiz_state(context, q)
+    return await show_quiz_card(query, context)
+
+
+async def quiz_dontknow_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    q = get_quiz_state(context)
+    words = q["words"]
+    idx = q["index"]
+    # Javobni ko'rsatamiz
+    german, uzbek = words[idx]
+
+    def esc(s):
+        for ch in r"\_*[]()~`>#+-=|{}.!":
+            s = s.replace(ch, f"\\{ch}")
+        return s
+
+    await query.answer(f"❌ {uzbek}", show_alert=True)
+    q["wrong"].append((german, uzbek))
+    q["index"] += 1
+    set_quiz_state(context, q)
+    return await show_quiz_card(query, context)
+
+
+async def quiz_repeat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Bilmaganlarni qayta boshlash"""
+    query = update.callback_query
+    await query.answer()
+    q = get_quiz_state(context)
+    wrong = q["wrong"]
+
+    random.shuffle(wrong)
+
+    set_quiz_state(context, {
+        "words": wrong,
+        "index": 0,
+        "wrong": [],
+        "total": len(wrong),
+        "level": q["level"],
+        "book":  q["book"],
+        "n":     q["n"],
+    })
+    return await show_quiz_card(query, context)
+
+
+# ==================== POMODORO ====================
+
+async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """pomodoro_start_{level}_{book}_{n}"""
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split("_")
+    level = parts[2]
+    n     = int(parts[-1])
+    book  = "_".join(parts[3:-1])
+
+    end_time = datetime.datetime.now() + datetime.timedelta(minutes=25)
+    end_str  = end_time.strftime("%H:%M")
+
+    context.user_data["pomodoro"] = {
+        "level": level, "book": book, "n": n, "end": end_str
+    }
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏹ To'xtatish", callback_data=CB.POMODORO_STOP)],
+        [InlineKeyboardButton(
+            "↩️ Lektsiyaga qaytish",
+            callback_data=f"lekt_{level}_{book}_{n}"
+        )],
+    ])
+
+    await query.edit_message_text(
+        f"🍅 *Pomodoro boshlandi\\!*\n\n"
+        f"⏱ 25 daqiqa o'qish vaqti\n"
+        f"🏁 Tugash: *{end_str}*\n\n"
+        f"Diqqatni jamlang va o'rganing\\! 💪\n"
+        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing\\.",
+        parse_mode="MarkdownV2",
+        reply_markup=keyboard
+    )
+    return POMODORO_STATE
+
+
+async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    p = context.user_data.get("pomodoro", {})
+
+    level = p.get("level", "a1")
+    book  = p.get("book", "motive")
+    n     = p.get("n", 1)
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton(
+            "↩️ Lektsiyaga qaytish",
+            callback_data=f"lekt_{level}_{book}_{n}"
+        )],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+    await query.edit_message_text(
+        "⏹ *Pomodoro to'xtatildi*\n\nYaxshi harakat\\! Davom eting 💪",
+        parse_mode="MarkdownV2",
+        reply_markup=keyboard
+    )
+    return MAIN_MENU
+
+
 # ==================== KEYBOARD HELPERS ====================
 
 def main_menu_keyboard():
@@ -1066,6 +1331,10 @@ async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         text = f"{level_label} \\| {label}\n📖 *Lektion {n}*\n\n{content}"
 
     keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🧠 Yodlash", callback_data=f"quiz_start_{level}_{book}_{n}"),
+            InlineKeyboardButton("🍅 Pomodoro", callback_data=f"pomodoro_start_{level}_{book}_{n}"),
+        ],
         [InlineKeyboardButton(
             "↩️ Lektsiyalarga qaytish",
             callback_data=f"book_{level}_{book}"
@@ -1167,6 +1436,14 @@ def main() -> None:
         CallbackQueryHandler(book_select_handler,  pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
         CallbackQueryHandler(back_book_handler,    pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
         CallbackQueryHandler(lektion_handler,      pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        # Quiz
+        CallbackQueryHandler(quiz_start_handler,   pattern=r"^quiz_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        CallbackQueryHandler(quiz_know_handler,    pattern=f"^{CB.QUIZ_KNOW}$"),
+        CallbackQueryHandler(quiz_dontknow_handler,pattern=f"^{CB.QUIZ_DONTKNOW}$"),
+        CallbackQueryHandler(quiz_repeat_handler,  pattern=f"^{CB.QUIZ_REPEAT}$"),
+        # Pomodoro
+        CallbackQueryHandler(pomodoro_start_handler, pattern=r"^pomodoro_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        CallbackQueryHandler(pomodoro_stop_handler,  pattern=f"^{CB.POMODORO_STOP}$"),
     ]
 
     conv_handler = ConversationHandler(
@@ -1181,6 +1458,8 @@ def main() -> None:
             C1_MENU:      common_handlers,
             BOOK_MENU:    common_handlers,
             TRANSLATOR:   common_handlers,
+            QUIZ_STATE:   common_handlers,
+            POMODORO_STATE: common_handlers,
         },
         fallbacks=[
             CommandHandler("start", start),
