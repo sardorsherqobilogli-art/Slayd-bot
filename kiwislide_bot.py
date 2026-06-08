@@ -1191,9 +1191,11 @@ def translator_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = (
-        "👋 *Sprechen mit Spaß* ga xush kelibsiz\\!\n\n"
-        "🇩🇪 Nemis tilini A1 dan C1 gacha o'rganing\\.\n"
-        "📚 Bo'limni tanlang:"
+        "🎉 *Sprechen mit Spaß\\!* 🇩🇪\n\n"
+"🚀 Nemis tilini o'rganishga xush kelibsiz\\!\n\n"
+"✨ A1 dan C1 gacha — har bir qadamda biz birgamiz\\!\n"
+"💪 Har kun biroz — katta natija\\!\n\n"
+"📚 Qayerdan boshlaymiz?"
     )
     if update.message:
         await update.message.reply_text(text, parse_mode="MarkdownV2",
