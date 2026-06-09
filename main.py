@@ -412,18 +412,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     db.generate_daily_missions(user_id)
 
     text = (
-        f"🎉 *Willkommen, {esc_md(first_name)}\!* 🇩🇪\n\n"
-        f"*Deutsch Meister Pro* \- sizning shaxsiy nemis tili murabbiyingiz\! 🚀\n\n"
+        f"🎉 *Willkommen, {esc_md(first_name)}* 🇩🇪\n\n"
+        f"*Deutsch Meister Pro* - sizning shaxsiy nemis tili murabbiyingiz! 🚀\n\n"
         f"✨ *Imkoniyatlar:*\n"
-        f"🤖 *AI Mentor* \- Daraja aniqlash, suhbat, xato banki\n"
-        f"📚 *Lektsiyalar* \- A1\-C1 darajalar bo'yicha\n"
-        f"🧠 *Flashcard* \- Vizual yodlash testlari\n"
-        f"🍅 *Pomodoro* \- Fokuslangan o'qish\n"
-        f"🌐 *Tarjimon* \- UZB↔DEU + AI tahlil\n"
-        f"📊 *Progress* \- XP tizimi va grafiklar\n"
-        f"🎙️ *Ovozli* \- Edge TTS + Whisper STT\n\n"
+        f"🤖 *AI Mentor* - Daraja aniqlash, suhbat, xato banki\n"
+        f"📚 *Lektsiyalar* - A1-C1 darajalar bo'yicha\n"
+        f"🧠 *Flashcard* - Vizual yodlash testlari\n"
+        f"🍅 *Pomodoro* - Fokuslangan o'qish\n"
+        f"🌐 *Tarjimon* - UZB↔DEU + AI tahlil\n"
+        f"📊 *Progress* - XP tizimi va grafiklar\n"
+        f"🎙️ *Ovozli* - Edge TTS + Whisper STT\n\n"
         f"📊 *Sizning darajangiz: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
-        f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang\! 👇"
+        f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang! 👇"
     )
 
     if update.message:
@@ -474,8 +474,8 @@ async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.edit_message_text(
         "📚 *Daraja tanlash*\n\n"
         "O'z darajangizni tanlang:\n"
-        "🟢 A1\-A2: Boshlang'ich\n"
-        "🟡 B1\-B2: O'rta\n"
+        "🟢 A1-A2: Boshlang'ich\n"
+        "🟡 B1-B2: O'rta\n"
         "🔴 C1: Yuqori",
         parse_mode="MarkdownV2",
         reply_markup=level_select_keyboard(),
@@ -559,7 +559,7 @@ async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await query.edit_message_text(
         f"{esc_md(level_label)} | {esc_md(label)}\n\n"
-        f"Lektion tanlang ({start}\-{end}):",
+        f"Lektion tanlang ({start}-{end}):",
         parse_mode="MarkdownV2",
         reply_markup=lektions_keyboard(level, book),
     )
@@ -786,7 +786,7 @@ async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     text_to_speak = ". ".join([g for g, u in sample])
 
     await query.edit_message_text(
-        f"🔊 *Lektion {n} \- Ovozli o'qish*\n\n"
+        f"🔊 *Lektion {n} - Ovozli o'qish*\n\n"
         f"10 ta tasodifiy so'z eshiting...",
         parse_mode="MarkdownV2",
     )
@@ -812,10 +812,10 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await query.edit_message_text(
         "🌐 *Tarjimon*\n\n"
-        "*Kontekst Tarjimon 2\.0*\n\n"
+        "*Kontekst Tarjimon 2.0*\n\n"
         "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
-        "🇺🇿➡️🇩🇪 O'zbek \-\> Nemis\n"
-        "🇩🇪➡️🇺🇿 Nemis \-\> O'zbek\n\n"
+        "🇺🇿➡️🇩🇪 O'zbek -\> Nemis\n"
+        "🇩🇪➡️🇺🇿 Nemis -\> O'zbek\n\n"
         "AI grammatika tahlili bilan!",
         parse_mode="MarkdownV2",
         reply_markup=translator_keyboard(),
@@ -829,8 +829,8 @@ async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "uzb_deu"
 
     await query.edit_message_text(
-        "🇺🇿➡️🇩🇪 *O'zbekcha \\-\\> Nemischa*\n\n"
-        "So'z, gap yoki matn yuboring\!\n\n"
+        "🇺🇿➡️🇩🇪 *O'zbekcha -\\> Nemischa*\n\n"
+        "So'z, gap yoki matn yuboring!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
         "📚 Lug'atdan + AI tarjima\n\n"
         "*Misol:* `Men 25 yoshdaman`",
@@ -846,8 +846,8 @@ async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "deu_uzb"
 
     await query.edit_message_text(
-        "🇩🇪➡️🇺🇿 *Nemischa \\-\\> O'zbekcha*\n\n"
-        "So'z, gap yoki matn yuboring\!\n\n"
+        "🇩🇪➡️🇺🇿 *Nemischa -\\> O'zbekcha*\n\n"
+        "So'z, gap yoki matn yuboring!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
         "📚 Lug'atdan + AI tarjima\n\n"
         "*Misol:* `Ich bin 25 Jahre alt`",
@@ -973,13 +973,13 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await query.answer()
 
     await query.edit_message_text(
-        "ℹ️ *Yordam \\- Deutsch Meister Pro*\n\n"
+        "ℹ️ *Yordam - Deutsch Meister Pro*\n\n"
         "*Buyruqlar:*\n"
         "/start \\— Botni ishga tushirish\n"
         "/menu \\— Asosiy menyu\n\n"
         "*Bo'limlar:*\n"
         "🤖 *AI Mentor* \\— Daraja aniqlash, suhbat, xatolar, ovozli lug'at, rolplay\n"
-        "📚 *Lektsiyalar* \\— A1\-C1 kitoblar va lektsiyalar\n"
+        "📚 *Lektsiyalar* \\— A1-C1 kitoblar va lektsiyalar\n"
         "🧠 *Flashcard* \\— Vizual yodlash testi\n"
         "🍅 *Pomodoro* \\— 25 daqiqali fokus taymeri\n"
         "🌐 *Tarjimon* \\— UZB↔DEU + AI grammatika tahlili\n"
@@ -1026,10 +1026,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start \\— Boshlash\n"
         "/menu \\— Menyu\n"
         "/help \\— Yordam\n\n"
-        "🤖 AI Mentor \- Shaxsiy AI yordamchi\n"
-        "📚 Lektsiyalar \- Daraja bo'yicha\n"
-        "🌐 Tarjimon \- UZB↔DEU\n"
-        "📊 Progress \- XP va grafiklar",
+        "🤖 AI Mentor - Shaxsiy AI yordamchi\n"
+        "📚 Lektsiyalar - Daraja bo'yicha\n"
+        "🌐 Tarjimon - UZB↔DEU\n"
+        "📊 Progress - XP va grafiklar",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
@@ -1045,12 +1045,12 @@ async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "/menu \\— Asosiy menyu\n"
         "/help \\— Yordam\n\n"
         "*Bo'limlar:*\n"
-        "🤖 AI Mentor \- Daraja aniqlash, suhbat\n"
-        "📚 Lektsiyalar \- A1\-C1 kitoblar\n"
-        "🧠 Flashcard \- Yodlash testlari\n"
-        "🍅 Pomodoro \- Fokus taymeri\n"
-        "🌐 Tarjimon \- UZB↔DEU\n"
-        "📊 Progress \- XP va grafiklar"
+        "🤖 AI Mentor - Daraja aniqlash, suhbat\n"
+        "📚 Lektsiyalar - A1-C1 kitoblar\n"
+        "🧠 Flashcard - Yodlash testlari\n"
+        "🍅 Pomodoro - Fokus taymeri\n"
+        "🌐 Tarjimon - UZB↔DEU\n"
+        "📊 Progress - XP va grafiklar"
     )
     await update.message.reply_text(
         text,
