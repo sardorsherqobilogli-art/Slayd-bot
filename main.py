@@ -172,7 +172,7 @@ def get_lektion_text(level: str, book: str, n: int) -> str:
     return (
         f"{level_label} | {label}\n"
         f"📖 *Lektion {n}*\n\n"
-        f"⏳ Bu lektion materiallari tez orada qo'shiladi!\n\n"
+        f"⏳ Bu lektion materiallari tez orada qo'shiladi\\!\n\n"
         f"📌 Hozircha A1 Motive lektsiyalari to'liq mavjud."
     )
 
@@ -355,7 +355,7 @@ async def show_quiz_card(query, context):
             wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
 
         text = (
-            f"🏁 *Test tugadi!*\n\n"
+            f"🏁 *Test tugadi\\!*\n\n"
             f"✅ Bildim: {correct}/{total}\n"
             f"❌ Bilmadim: {len(wrong)}/{total}"
             + wrong_text
@@ -425,7 +425,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         f"📊 *Progress* \\- XP tizimi va grafiklar\n"
         f"🎙️ *Ovozli* \\- Edge TTS \\+ Whisper STT\n\n"
         f"📊 *Sizning darajangiz: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
-        f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang! 👇"
+        f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang\\! 👇"
     )
 
     if update.message:
@@ -722,10 +722,10 @@ async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_T
     ])
 
     await query.edit_message_text(
-        f"🍅 *Pomodoro boshlandi!*\n\n"
+        f"🍅 *Pomodoro boshlandi\\!*\n\n"
         f"⏱ 25 daqiqa o'qish vaqti\n"
         f"🏁 Tugash: *{end_str}*\n\n"
-        f"Diqqatni jamlang va o'rganing! 💪\n"
+        f"Diqqatni jamlang va o'rganing\\! 💪\n"
         f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing.",
         parse_mode="MarkdownV2",
         reply_markup=keyboard
@@ -760,7 +760,7 @@ async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text(
         f"⏹️ *Pomodoro to'xtatildi*\n\n"
         f"🎁 *+{XP_REWARDS['pomodoro_25min']} XP*\n\n"
-        f"Yaxshi harakat! Davom eting 💪",
+        f"Yaxshi harakat\\! Davom eting 💪",
         parse_mode="MarkdownV2",
         reply_markup=keyboard
     )
@@ -796,7 +796,7 @@ async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     await speak_text(query, text_to_speak, voice="female", speed=0.9)
 
     await query.message.reply_text(
-        "🔊 Ovozli o'qish tugadi!\n\nYana tinglashni xohlaysizmi?",
+        "🔊 Ovozli o'qish tugadi\\!\n\nYana tinglashni xohlaysizmi?",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔁 Yana", callback_data=f"tts_lekt_{level}_{book}_{n}")],
             [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
@@ -818,7 +818,7 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
         "🇺🇿➡️🇩🇪 O'zbek \\- Nemis\n"
         "🇩🇪➡️🇺🇿 Nemis \\- O'zbek\n\n"
-        "AI grammatika tahlili bilan!",
+        "AI grammatika tahlili bilan\\!",
         parse_mode="MarkdownV2",
         reply_markup=translator_keyboard(),
     )
@@ -832,7 +832,7 @@ async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await query.edit_message_text(
         "🇺🇿➡️🇩🇪 *O'zbekcha -\\> Nemischa*\n\n"
-        "So'z, gap yoki matn yuboring!\n\n"
+        "So'z, gap yoki matn yuboring\\!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
         "📚 Lug'atdan + AI tarjima\n\n"
         "*Misol:* `Men 25 yoshdaman`",
@@ -849,7 +849,7 @@ async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await query.edit_message_text(
         "🇩🇪➡️🇺🇿 *Nemischa -\\> O'zbekcha*\n\n"
-        "So'z, gap yoki matn yuboring!\n\n"
+        "So'z, gap yoki matn yuboring\\!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
         "📚 Lug'atdan + AI tarjima\n\n"
         "*Misol:* `Ich bin 25 Jahre alt`",
@@ -1086,7 +1086,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # ... (keyingi savol yuborish)
         await update.message.reply_text(
             f"🎤 *Ovozli javob qabul qilindi:*\n_{esc_md(text)}_\n\n"
-            f"✅ Qabul qilindi! Davom etamiz...",
+            f"✅ Qabul qilindi\\! Davom etamiz...",
             parse_mode="MarkdownV2",
         )
         return
