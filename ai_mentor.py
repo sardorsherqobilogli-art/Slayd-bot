@@ -292,11 +292,11 @@ async def level_detect_result(query, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     # Daraja tavsifi
     level_desc = {
-        "a1": "Boshlang'ich daraja. A1 kitoblari va lektsiyalaridan boshlang! 📚",
-        "a2": "Elementar daraja. Asosiy grammatikani mustahkamlang! 📖",
-        "b1": "O'rta daraja. Muloqot va murakkab mavzularni o'rganing! 💬",
-        "b2": "Yuqori o'rta daraja. Akademik va professional nemis tiliga o'ting! 🎓",
-        "c1": "Yuqori daraja. Professional va ilmiy darajada erkin muloqot! 🏆",
+        "a1": "Boshlang'ich daraja\\. A1 kitoblari va lektsiyalaridan boshlang\\! 📚",
+        "a2": "Elementar daraja\\. Asosiy grammatikani mustahkamlang\\! 📖",
+        "b1": "O'rta daraja\\. Muloqot va murakkab mavzularni o'rganing\\! 💬",
+        "b2": "Yuqori o'rta daraja\\. Akademik va professional nemis tiliga o'ting\\! 🎓",
+        "c1": "Yuqori daraja\\. Professional va ilmiy darajada erkin muloqot\\! 🏆",
     }
     text += level_desc.get(level, "")
 
@@ -330,11 +330,11 @@ async def level_detect_text_result(update: Update, context: ContextTypes.DEFAULT
     db.update_user(user_id, current_level=level)
 
     level_desc = {
-        "a1": "Boshlang'ich daraja. A1 kitoblari va lektsiyalaridan boshlang! 📚",
-        "a2": "Elementar daraja. Asosiy grammatikani mustahkamlang! 📖",
-        "b1": "O'rta daraja. Muloqot va murakkab mavzularni o'rganing! 💬",
-        "b2": "Yuqori o'rta daraja. Akademik va professional nemis tiliga o'ting! 🎓",
-        "c1": "Yuqori daraja. Professional va ilmiy darajada erkin muloqot! 🏆",
+        "a1": "Boshlang'ich daraja\\. A1 kitoblari va lektsiyalaridan boshlang\\! 📚",
+        "a2": "Elementar daraja\\. Asosiy grammatikani mustahkamlang\\! 📖",
+        "b1": "O'rta daraja\\. Muloqot va murakkab mavzularni o'rganing\\! 💬",
+        "b2": "Yuqori o'rta daraja\\. Akademik va professional nemis tiliga o'ting\\! 🎓",
+        "c1": "Yuqori daraja\\. Professional va ilmiy darajada erkin muloqot\\! 🏆",
     }
 
     await update.message.reply_text(
@@ -363,10 +363,10 @@ async def vorstellen_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     text = (
         "🎤 *Vorstellen \\- O'zingizni taqdim etish*\n\n"
-        "Men sizga 3 ta savol beraman\! Nemis yoki o'zbek tilida javob bering\!\n\n"
-        "*1\-savol:*\n"
-        "Stellen Sie sich vor\\! \(O'zingizni taqdim eting\\!\)\n\n"
-        "Ismingiz, yoshingiz, qayerdanligingiz, nima ish qilishingiz haqida ayting\!"
+        "Men sizga 3 ta savol beraman\\! Nemis yoki o'zbek tilida javob bering\\!\n\n"
+        "*1\\-savol:*\n"
+        "Stellen Sie sich vor\\! \\(O'zingizni taqdim eting\\!\\)\n\n"
+        "Ismingiz, yoshingiz, qayerdanligingiz, nima ish qilishingiz haqida ayting\\!"
     )
 
     await query.edit_message_text(
@@ -390,7 +390,7 @@ async def vorstellen_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(
             "🎙️ *Ovozli javob rejimi*\n\n"
-            "Nemischa gapiring va men tahlil qilaman!",
+            "Nemischa gapiring va men tahlil qilaman\\!",
             parse_mode="MarkdownV2",
         )
         return VORSTELLEN_START
@@ -507,7 +507,7 @@ async def erfahrungen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         await query.edit_message_text(
             f"💬 *Erfahrungen* faqat *B2 va C1* darajalarida mavjud\\!\n\n"
             f"Sizning darajangiz: {esc_md(LEVEL_LABELS.get(level, level))}\n\n"
-            f"Avval darajangizni oshiring! 📚",
+            f"Avval darajangizni oshiring\\! 📚",
             parse_mode="MarkdownV2",
             reply_markup=ai_mentor_menu_keyboard(),
         )
@@ -608,7 +608,7 @@ async def erfahrungen_start_chat(update: Update, context: ContextTypes.DEFAULT_T
         f"Qiyinlik: {difficulty.upper()}\n\n"
         f"📝 *Savol:*\n{esc_md(question)}\n\n"
         f"{esc_md(ai_response)}\n\n"
-        f"*Javobingizni yozing!* (yoki 🎙️ ovozli yuboring)",
+        f"*Javobingizni yozing\\!* \\(yoki 🎙️ ovozli yuboring\\)",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
@@ -751,14 +751,14 @@ async def mistake_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
 
     if stats["active"] > 0:
-        text += "Xatolaringizni ko'rib chiqing va mini-darslarni o'ting! 📚"
+        text += "Xatolaringizni ko'rib chiqing va mini\\-darslarni o'ting\\! 📚"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📋 Xatolar ro'yxati", callback_data="mistake_list")],
             [InlineKeyboardButton("🎲 Tasodifiy mini-dars", callback_data="mistake_random")],
             [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
         ])
     else:
-        text += "Ajoyib! Sizda faol xatolar yo'q! 🎉\n\n"
+        text += "Ajoyib\\! Sizda faol xatolar yo'q\\! 🎉\n\n"
         text += "AI Mentor bilan suhbatlashishda xatolar avtomatik saqlanadi."
         keyboard = ai_mentor_menu_keyboard()
 
@@ -786,7 +786,7 @@ async def mistake_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     text = "🔧 *Sizning xatolarингiz:*\n\n"
     keyboard_rows = []
     for i, m in enumerate(mistakes[:5], 1):
-        text += f"{i}\. *{esc_md(m['user_input'])}* \\→ {esc_md(m['correct_form'])}\n"
+        text += f"{i}\\. *{esc_md(m['user_input'])}* \\→ {esc_md(m['correct_form'])}\n"
         text += f"   Turi: {esc_md(m['mistake_type'])}\n\n"
         keyboard_rows.append([InlineKeyboardButton(
             f"{i}. {m['user_input'][:20]}... → Mini-dars",
@@ -939,7 +939,7 @@ async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT
 
     if is_correct:
         ex_data["correct"] += 1
-        await update.message.reply_text(f"✅ *To'g'ri!* {esc_md(correct_answer)}", parse_mode="MarkdownV2")
+        await update.message.reply_text(f"✅ *To'g'ri\\!* {esc_md(correct_answer)}", parse_mode="MarkdownV2")
     else:
         await update.message.reply_text(
             f"❌ *Noto'g'ri*\nSiz: {esc_md(user_answer)}\nTo'g'ri: {esc_md(correct_answer)}",
@@ -963,15 +963,15 @@ async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT
         if correct_count == total:
             db.master_mistake(mistake_id)
             await update.message.reply_text(
-                f"🎉 *Barcha mashqlar bajarildi!* {correct_count}/{total}\n\n"
-                f"✅ Bu xato o'zlashtirildi!\n\n"
+                f"🎉 *Barcha mashqlar bajarildi\\!* {correct_count}/{total}\n\n"
+                f"✅ Bu xato o'zlashtirildi\\!\n\n"
                 f"🎁 *+{XP_REWARDS['mistake_corrected']} XP*",
                 reply_markup=ai_mentor_menu_keyboard(),
             )
         else:
             await update.message.reply_text(
                 f"📊 *Natija: {correct_count}/{total}*\n\n"
-                f"Yana mashq qilishingiz mumkin!",
+                f"Yana mashq qilishingiz mumkin\\!",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔁 Qayta mashq", callback_data=f"mistake_practice_{mistake_id}")],
                     [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
