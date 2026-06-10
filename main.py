@@ -95,7 +95,7 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
     UZB_DEU_INPUT,
     DEU_UZB_INPUT,
     # AI Mentor states imported from ai_mentor
-) = range(15)
+) = range(14)
 
 
 # ==================== CALLBACK CONSTANTS ====================
