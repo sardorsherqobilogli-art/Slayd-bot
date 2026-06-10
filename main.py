@@ -460,7 +460,7 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     await query.edit_message_text(
         "🏠 *Asosiy Menu*\n\n"
         f"📊 Daraja: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}\n"
-        f"⭐ XP: {user.get('total_xp', 0)}\n\n"
+        f"⭐ XP: {esc_md(str(user.get('total_xp', 0)))}\n\n"
         "Bo'limni tanlang:",
         parse_mode="MarkdownV2",
         reply_markup=main_menu_keyboard(),
@@ -476,8 +476,8 @@ async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     await query.edit_message_text(
         "📚 *Daraja tanlash*\n\n"
         "O'z darajangizni tanlang:\n"
-        "🟢 A1-A2: Boshlang'ich\n"
-        "🟡 B1-B2: O'rta\n"
+        "🟢 A1\\-A2: Boshlang'ich\n"
+        "🟡 B1\\-B2: O'rta\n"
         "🔴 C1: Yuqori",
         parse_mode="MarkdownV2",
         reply_markup=level_select_keyboard(),
@@ -560,8 +560,8 @@ async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     level_label = LEVEL_LABELS.get(level, level)
 
     await query.edit_message_text(
-        f"{esc_md(level_label)} | {esc_md(label)}\n\n"
-        f"Lektion tanlang ({start}-{end}):",
+        f"{esc_md(level_label)} \\| {esc_md(label)}\n\n"
+        f"Lektion tanlang \\({esc_md(str(start))}\\-{esc_md(str(end))}\\):",
         parse_mode="MarkdownV2",
         reply_markup=lektions_keyboard(level, book),
     )
@@ -595,7 +595,7 @@ async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if content.startswith("🇩🇪"):
         text = content
     else:
-        text = f"{esc_md(level_label)} | {esc_md(label)}\n📖 *Lektion {n}*\n\n{content}"
+        text = f"{esc_md(level_label)} \\| {esc_md(label)}\n📖 *Lektion {n}*\n\n{content}"
 
     keyboard = InlineKeyboardMarkup([
         [
@@ -726,7 +726,7 @@ async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_T
         f"⏱ 25 daqiqa o'qish vaqti\n"
         f"🏁 Tugash: *{end_str}*\n\n"
         f"Diqqatni jamlang va o'rganing\\! 💪\n"
-        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing.",
+        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing\.",
         parse_mode="MarkdownV2",
         reply_markup=keyboard
     )
@@ -759,7 +759,7 @@ async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TY
 
     await query.edit_message_text(
         f"⏹️ *Pomodoro to'xtatildi*\n\n"
-        f"🎁 *+{XP_REWARDS['pomodoro_25min']} XP*\n\n"
+        f"🎁 *\\+{esc_md(str(XP_REWARDS['pomodoro_25min']))} XP*\n\n"
         f"Yaxshi harakat\\! Davom eting 💪",
         parse_mode="MarkdownV2",
         reply_markup=keyboard
@@ -789,7 +789,7 @@ async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await query.edit_message_text(
         f"🔊 *Lektion {n} \\- Ovozli o'qish*\n\n"
-        f"10 ta tasodifiy so'z eshiting...",
+        f"10 ta tasodifiy so'z eshiting\.\.\.",
         parse_mode="MarkdownV2",
     )
 
@@ -814,7 +814,7 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await query.edit_message_text(
         "🌐 *Tarjimon*\n\n"
-        "*Kontekst Tarjimon 2.0*\n\n"
+        "*Kontekst Tarjimon 2\.0*\n\n"
         "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
         "🇺🇿➡️🇩🇪 O'zbek \\- Nemis\n"
         "🇩🇪➡️🇺🇿 Nemis \\- O'zbek\n\n"
@@ -831,10 +831,10 @@ async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "uzb_deu"
 
     await query.edit_message_text(
-        "🇺🇿➡️🇩🇪 *O'zbekcha -\\> Nemischa*\n\n"
+        "🇺🇿➡️🇩🇪 *O'zbekcha \\-\\> Nemischa*\n\n"
         "So'z, gap yoki matn yuboring\\!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
-        "📚 Lug'atdan + AI tarjima\n\n"
+        "📚 Lug'atdan \\+ AI tarjima\n\n"
         "*Misol:* `Men 25 yoshdaman`",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
@@ -848,10 +848,10 @@ async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     context.user_data["translator_dir"] = "deu_uzb"
 
     await query.edit_message_text(
-        "🇩🇪➡️🇺🇿 *Nemischa -\\> O'zbekcha*\n\n"
+        "🇩🇪➡️🇺🇿 *Nemischa \\-\\> O'zbekcha*\n\n"
         "So'z, gap yoki matn yuboring\\!\n\n"
         "✨ AI grammatika tahlili bilan tarjima\n"
-        "📚 Lug'atdan + AI tarjima\n\n"
+        "📚 Lug'atdan \\+ AI tarjima\n\n"
         "*Misol:* `Ich bin 25 Jahre alt`",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
@@ -981,21 +981,21 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "/menu \\— Asosiy menyu\n\n"
         "*Bo'limlar:*\n"
         "🤖 *AI Mentor* \\— Daraja aniqlash, suhbat, xatolar, ovozli lug'at, rolplay\n"
-        "📚 *Lektsiyalar* \\— A1-C1 kitoblar va lektsiyalar\n"
+        "📚 *Lektsiyalar* \\— A1\\-C1 kitoblar va lektsiyalar\n"
         "🧠 *Flashcard* \\— Vizual yodlash testi\n"
         "🍅 *Pomodoro* \\— 25 daqiqali fokus taymeri\n"
-        "🌐 *Tarjimon* \\— UZB↔DEU + AI grammatika tahlili\n"
+        "🌐 *Tarjimon* \\— UZB↔DEU \\+ AI grammatika tahlili\n"
         "📊 *Progress* \\— XP tizimi, grafiklar, kunlik vazifalar\n"
         "⚙️ *Sozlamalar* \\— Ovoz, tezlik, daraja\n\n"
         "*Ovozli funksiyalar:*\n"
-        "🎙️ *TTS* \\— Matnni ovozga aylantirish (Edge TTS, German)\n"
-        "🎤 *STT* \\— Ovozni matnga o'girish (Groq Whisper)\n\n"
+        "🎙️ *TTS* \\— Matnni ovozga aylantirish \\(Edge TTS, German\\)\n"
+        "🎤 *STT* \\— Ovozni matnga o'girish \\(Groq Whisper\\)\n\n"
         "*XP tizimi:*\n"
-        "• Flashcard: +10 XP\n"
-        "• AI suhbat: +50 XP\n"
-        "• Xatoni tuzatish: +20 XP\n"
-        "• Pomodoro 25 min: +30 XP\n"
-        "• Level Up: +100 XP\n\n"
+        "• Flashcard: \\+10 XP\n"
+        "• AI suhbat: \\+50 XP\n"
+        "• Xatoni tuzatish: \\+20 XP\n"
+        "• Pomodoro 25 min: \\+30 XP\n"
+        "• Level Up: \\+100 XP\n\n"
         "*Qo'shimcha:*\n"
         "📋 Pastki '📚 Menyu' tugmasi bilan tez kirish\n"
         "💬 Har qanday joyda /menu bilan menyu ochish",
@@ -1014,7 +1014,7 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(
         "🏠 *Asosiy Menu*\n\n"
         f"📊 Daraja: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}\n"
-        f"⭐ XP: {user.get('total_xp', 0)}\n\n"
+        f"⭐ XP: {esc_md(str(user.get('total_xp', 0)))}\n\n"
         "Bo'limni tanlang:",
         parse_mode="MarkdownV2",
         reply_markup=main_menu_keyboard(),
@@ -1086,7 +1086,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # ... (keyingi savol yuborish)
         await update.message.reply_text(
             f"🎤 *Ovozli javob qabul qilindi:*\n_{esc_md(text)}_\n\n"
-            f"✅ Qabul qilindi\\! Davom etamiz...",
+            f"✅ Qabul qilindi\\! Davom etamiz\.\.\.",
             parse_mode="MarkdownV2",
         )
         return
@@ -1099,7 +1099,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     if "roleplay" in context.user_data:
         await update.message.reply_text(
             f"🎤 *Ovozli javob:*\n_{esc_md(text)}_\n\n"
-            f"AI javob yozmoqda...",
+            f"AI javob yozmoqda\.\.\.",
             parse_mode="MarkdownV2",
         )
         # Roleplay chatga yo'naltirish
@@ -1126,7 +1126,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text(
         f"🎤 *Siz:* _{esc_md(text)}_\n\n"
         f"🤖 *AI Mentor:*\n{esc_md(ai_response)}\n\n"
-        f"🎁 *+{XP_REWARDS['voice_practice']} XP*",
+        f"🎁 *\\+{esc_md(str(XP_REWARDS['voice_practice']))} XP*",
         parse_mode="MarkdownV2",
     )
 
