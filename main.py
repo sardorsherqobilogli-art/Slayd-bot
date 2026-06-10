@@ -726,7 +726,7 @@ async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_T
         f"⏱ 25 daqiqa o'qish vaqti\n"
         f"🏁 Tugash: *{end_str}*\n\n"
         f"Diqqatni jamlang va o'rganing\\! 💪\n"
-        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing\.",
+        f"25 daqiqa o'tgach qaytib keling va To'xtatish tugmasini bosing\\.",
         parse_mode="MarkdownV2",
         reply_markup=keyboard
     )
@@ -789,7 +789,7 @@ async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await query.edit_message_text(
         f"🔊 *Lektion {n} \\- Ovozli o'qish*\n\n"
-        f"10 ta tasodifiy so'z eshiting\.\.\.",
+        f"10 ta tasodifiy so'z eshiting\\.\\.\\.",
         parse_mode="MarkdownV2",
     )
 
@@ -814,7 +814,7 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await query.edit_message_text(
         "🌐 *Tarjimon*\n\n"
-        "*Kontekst Tarjimon 2\.0*\n\n"
+        "*Kontekst Tarjimon 2\\.0*\n\n"
         "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
         "🇺🇿➡️🇩🇪 O'zbek \\- Nemis\n"
         "🇩🇪➡️🇺🇿 Nemis \\- O'zbek\n\n"
@@ -929,7 +929,7 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
     text += f"📝 *Asl matn:* {esc_md(word)}\n\n"
     text += f"✅ *Tarjima:* {esc_md(translation)}\n"
     if level:
-        text += f"📊 *Daraja:* {level}\n"
+        text += f"📊 *Daraja:* {esc_md(level)}\n"
     text += "\n"
     if grammar:
         text += f"🧠 *Grammatika tahlili:*\n{esc_md(grammar)}\n\n"
@@ -1086,7 +1086,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         # ... (keyingi savol yuborish)
         await update.message.reply_text(
             f"🎤 *Ovozli javob qabul qilindi:*\n_{esc_md(text)}_\n\n"
-            f"✅ Qabul qilindi\\! Davom etamiz\.\.\.",
+            f"✅ Qabul qilindi\\! Davom etamiz\\.\\.\\.",
             parse_mode="MarkdownV2",
         )
         return
@@ -1099,7 +1099,7 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
     if "roleplay" in context.user_data:
         await update.message.reply_text(
             f"🎤 *Ovozli javob:*\n_{esc_md(text)}_\n\n"
-            f"AI javob yozmoqda\.\.\.",
+            f"AI javob yozmoqda\\.\\.\\.",
             parse_mode="MarkdownV2",
         )
         # Roleplay chatga yo'naltirish
