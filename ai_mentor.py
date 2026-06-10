@@ -1445,8 +1445,8 @@ async def ai_mentor_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         "🎯 *Darajani aniqlash* \\- 5 ta savol bilan darajangizni bilib oling\n"
         "🎤 *Vorstellen* \\- O'zingizni taqdim etish mashqi\n"
         "💬 *Erfahrungen* \\- B2/C1 mavzularida suhbatlashish\n"
-        "🔧 *Xato banki* \\- Xatolaringizni saqlash va mini-darslar\n"
-        "🎙️ *Ovozli lug'at* \\- TTS + talaffuz tahlili\n"
+        "🔧 *Xato banki* \\- Xatolaringizni saqlash va mini\\-darslar\n"
+        "🎙️ *Ovozli lug'at* \\- TTS \\+ talaffuz tahlili\n"
         "🎭 *Rolli o'yinlar* \\- Hayotiy situatsiyalar\n\n"
         "*Bo'limni tanlang:*",
         parse_mode="MarkdownV2",
