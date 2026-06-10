@@ -415,15 +415,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     text = (
         f"🎉 *Willkommen, {esc_md(first_name)}* 🇩🇪\n\n"
-        f"*Deutsch Meister Pro* - sizning shaxsiy nemis tili murabbiyingiz! 🚀\n\n"
+        f"*Deutsch Meister Pro* \\- sizning shaxsiy nemis tili murabbiyingiz\\! 🚀\n\n"
         f"✨ *Imkoniyatlar:*\n"
-        f"🤖 *AI Mentor* - Daraja aniqlash, suhbat, xato banki\n"
-        f"📚 *Lektsiyalar* - A1-C1 darajalar bo'yicha\n"
-        f"🧠 *Flashcard* - Vizual yodlash testlari\n"
-        f"🍅 *Pomodoro* - Fokuslangan o'qish\n"
-        f"🌐 *Tarjimon* - UZB↔DEU + AI tahlil\n"
-        f"📊 *Progress* - XP tizimi va grafiklar\n"
-        f"🎙️ *Ovozli* - Edge TTS + Whisper STT\n\n"
+        f"🤖 *AI Mentor* \\- Daraja aniqlash, suhbat, xato banki\n"
+        f"📚 *Lektsiyalar* \\- A1\\-C1 darajalar bo'yicha\n"
+        f"🧠 *Flashcard* \\- Vizual yodlash testlari\n"
+        f"🍅 *Pomodoro* \\- Fokuslangan o'qish\n"
+        f"🌐 *Tarjimon* \\- UZB↔DEU \\+ AI tahlil\n"
+        f"📊 *Progress* \\- XP tizimi va grafiklar\n"
+        f"🎙️ *Ovozli* \\- Edge TTS \\+ Whisper STT\n\n"
         f"📊 *Sizning darajangiz: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
         f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang! 👇"
     )
@@ -788,7 +788,7 @@ async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     text_to_speak = ". ".join([g for g, u in sample])
 
     await query.edit_message_text(
-        f"🔊 *Lektion {n} - Ovozli o'qish*\n\n"
+        f"🔊 *Lektion {n} \\- Ovozli o'qish*\n\n"
         f"10 ta tasodifiy so'z eshiting...",
         parse_mode="MarkdownV2",
     )
@@ -816,8 +816,8 @@ async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "🌐 *Tarjimon*\n\n"
         "*Kontekst Tarjimon 2.0*\n\n"
         "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
-        "🇺🇿➡️🇩🇪 O'zbek -\> Nemis\n"
-        "🇩🇪➡️🇺🇿 Nemis -\> O'zbek\n\n"
+        "🇺🇿➡️🇩🇪 O'zbek \\- Nemis\n"
+        "🇩🇪➡️🇺🇿 Nemis \\- O'zbek\n\n"
         "AI grammatika tahlili bilan!",
         parse_mode="MarkdownV2",
         reply_markup=translator_keyboard(),
@@ -975,7 +975,7 @@ async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     await query.answer()
 
     await query.edit_message_text(
-        "ℹ️ *Yordam - Deutsch Meister Pro*\n\n"
+        "ℹ️ *Yordam \\- Deutsch Meister Pro*\n\n"
         "*Buyruqlar:*\n"
         "/start \\— Botni ishga tushirish\n"
         "/menu \\— Asosiy menyu\n\n"
@@ -1028,10 +1028,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "/start \\— Boshlash\n"
         "/menu \\— Menyu\n"
         "/help \\— Yordam\n\n"
-        "🤖 AI Mentor - Shaxsiy AI yordamchi\n"
-        "📚 Lektsiyalar - Daraja bo'yicha\n"
-        "🌐 Tarjimon - UZB↔DEU\n"
-        "📊 Progress - XP va grafiklar",
+        "🤖 AI Mentor \\- Shaxsiy AI yordamchi\n"
+        "📚 Lektsiyalar \\- Daraja bo'yicha\n"
+        "🌐 Tarjimon \\- UZB↔DEU\n"
+        "📊 Progress \\- XP va grafiklar",
         parse_mode="MarkdownV2",
         reply_markup=back_to_main_keyboard(),
     )
@@ -1047,12 +1047,12 @@ async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "/menu \\— Asosiy menyu\n"
         "/help \\— Yordam\n\n"
         "*Bo'limlar:*\n"
-        "🤖 AI Mentor - Daraja aniqlash, suhbat\n"
-        "📚 Lektsiyalar - A1-C1 kitoblar\n"
-        "🧠 Flashcard - Yodlash testlari\n"
-        "🍅 Pomodoro - Fokus taymeri\n"
-        "🌐 Tarjimon - UZB↔DEU\n"
-        "📊 Progress - XP va grafiklar"
+        "🤖 AI Mentor \\- Daraja aniqlash, suhbat\n"
+        "📚 Lektsiyalar \\- A1\\-C1 kitoblar\n"
+        "🧠 Flashcard \\- Yodlash testlari\n"
+        "🍅 Pomodoro \\- Fokus taymeri\n"
+        "🌐 Tarjimon \\- UZB↔DEU\n"
+        "📊 Progress \\- XP va grafiklar"
     )
     await update.message.reply_text(
         text,
