@@ -10,6 +10,7 @@ import io
 import asyncio
 import tempfile
 import httpx
+import edge_tts
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -25,8 +26,6 @@ from config import (
 class EdgeTTS:
     """Microsoft Edge TTS — bepul, German neural ovoz"""
 
-    EDGE_TTS_URL = "https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/v1"
-
     @staticmethod
     async def text_to_speech(text: str, voice: str = None, speed: float = 1.0) -> bytes:
         """
@@ -37,33 +36,20 @@ class EdgeTTS:
         voice_key = voice if voice in TTS_VOICES else "female"
         voice_name = TTS_VOICES[voice_key]
 
-        # SSML format
-        ssml = f"""<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="de-DE">
-            <voice name="{voice_name}">
-                <prosody rate="{int((speed - 1.0) * 50)}%">
-                    {text}
-                </prosody>
-            </voice>
-        </speak>"""
-
-        headers = {
-            "Content-Type": "application/ssml+xml",
-            "X-Microsoft-OutputFormat": "audio-24khz-48kbitrate-mono-mp3",
-            "User-Agent": "Mozilla/5.0",
-        }
+        # Tezlikni edge_tts formatiga o'tkazish: 1.0 → "+0%", 1.5 → "+50%", 0.5 → "-50%"
+        rate_percent = int((speed - 1.0) * 100)
+        rate_str = f"+{rate_percent}%" if rate_percent >= 0 else f"{rate_percent}%"
 
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    EdgeTTS.EDGE_TTS_URL,
-                    headers=headers,
-                    content=ssml.encode("utf-8"),
-                )
-                if resp.status_code == 200:
-                    return resp.content
-                else:
-                    logger.error(f"Edge TTS xatosi: {resp.status_code}")
-                    return None
+            communicate = edge_tts.Communicate(text, voice_name, rate=rate_str)
+            audio_chunks = []
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_chunks.append(chunk["data"])
+            if not audio_chunks:
+                logger.error("Edge TTS: audio chunk kelmadi")
+                return None
+            return b"".join(audio_chunks)
         except Exception as e:
             logger.error(f"Edge TTS xato: {e}")
             return None
@@ -263,9 +249,10 @@ async def speak_text(update: Update, text: str, voice: str = "female",
     return await EdgeTTS.send_voice_message(update, text, voice, speed, caption)
 
 
-async def listen_to_voice(update: Update, language: str = "de") -> str:
+async def listen_to_voice(update: Update, context: ContextTypes.DEFAULT_TYPE = None,
+                          language: str = "de") -> str:
     """Qulay funksiya - ovoz xabarini matnga o'girish"""
-    return await WhisperSTT.process_voice_message(update, None, language)
+    return await WhisperSTT.process_voice_message(update, context, language)
 
 
 async def analyze_pronunciation(german_word: str, user_text: str) -> dict:
