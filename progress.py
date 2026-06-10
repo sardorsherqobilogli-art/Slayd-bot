@@ -309,7 +309,7 @@ async def progress_missions(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         if m["is_completed"]:
             completed_count += 1
 
-        text += f"{status} *{i}\.* {esc_md(m['description'])} {progress} \\+{xp} XP\n"
+        text += f"{status} *{i}\\.* {esc_md(m['description'])} {progress} \\+{xp} XP\n"
 
     text += f"\n📊 *Jami:* {completed_count}/{len(missions)} bajarildi\n"
     text += f"🎁 *Mumkin bo'lgan XP:* {total_xp}"
@@ -342,8 +342,8 @@ async def progress_levelup(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     if current_idx >= len(level_order) - 1:
         await query.edit_message_text(
-            "🏆 *Tabriklaymiz\!*\n\n"
-            "Siz eng yuqori C1 darajadasiz\! 🎉\n\n"
+            "🏆 *Tabriklaymiz\\!*\n\n"
+            "Siz eng yuqori C1 darajadasiz\\! 🎉\n\n"
             "Davom eting! Yangi mavzular qo'shilmoqda...",
             parse_mode="MarkdownV2",
             reply_markup=InlineKeyboardMarkup([
