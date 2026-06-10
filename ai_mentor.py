@@ -651,7 +651,7 @@ async def erfahrungen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     await update.message.reply_text(
         f"{esc_md(ai_response)}\n\n"
-        f"*({turns}/5)* \\-> Javobingizni yozing:",
+        f"*\\({turns}/5\\)* \\-\\> Javobingizni yozing:",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
@@ -841,11 +841,11 @@ Quyidagi formatda mini-dars bering (faqat JSON):
         ], max_tokens=1024)
 
         lesson_text = (
-            f"📚 *Grammatik qoida:*\n{result.get('rule', 'N/A')}\n\n"
-            f"📝 *Tushuntirish:*\n{result.get('explanation', 'N/A')}\n\n"
-            f"✅ *To'g'ri misollar:*\n{result.get('example_correct', 'N/A')}\n\n"
-            f"❌ *Noto'g'ri misollar:*\n{result.get('example_wrong', 'N/A')}\n\n"
-            f"💡 *Maslahat:*\n{result.get('tip', 'N/A')}"
+            f"📚 *Grammatik qoida:*\n{esc_md(result.get('rule', 'N/A'))}\n\n"
+            f"📝 *Tushuntirish:*\n{esc_md(result.get('explanation', 'N/A'))}\n\n"
+            f"✅ *To'g'ri misollar:*\n{esc_md(result.get('example_correct', 'N/A'))}\n\n"
+            f"❌ *Noto'g'ri misollar:*\n{esc_md(result.get('example_wrong', 'N/A'))}\n\n"
+            f"💡 *Maslahat:*\n{esc_md(result.get('tip', 'N/A'))}"
         )
 
         # Saqlash
@@ -859,7 +859,7 @@ Quyidagi formatda mini-dars bering (faqat JSON):
         f"❌ *Sizning xato: {esc_md(mistake['user_input'])}*\n"
         f"✅ *To'g'ri: {esc_md(mistake['correct_form'])}*\n"
         f"📌 *Turi: {esc_md(mistake['mistake_type'])}*\n\n"
-        f"{esc_md(lesson_text)}",
+        f"{lesson_text}",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("✏️ Mashqlarni bajarish", callback_data=f"mistake_practice_{mistake_id}")],
