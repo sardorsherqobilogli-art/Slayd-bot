@@ -80,9 +80,9 @@ async def progress_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     )
 
     if next_level:
-        text += f"📊 *Keyingi darajagacha:* {total_xp}/{xp_needed} XP ({xp_progress}%)\n"
+        text += f"📊 *Keyingi darajagacha:* {total_xp}/{xp_needed} XP \\({xp_progress}%\\)\n"
     else:
-        text += "🏆 *Eng yuqori daraja!*\n"
+        text += "🏆 *Eng yuqori daraja\\!*\n"
 
     text += (
         f"🔥 *Streak:* {streak} kun\n"
