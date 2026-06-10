@@ -114,8 +114,8 @@ async def settings_level(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.edit_message_text(
         "📊 *Daraja tanlash*\n\n"
         "O'z darajangizni tanlang:\n"
-        "🟢 A1\-A2: Boshlang'ich\n"
-        "🟡 B1\-B2: O'rta\n"
+        "🟢 A1\\-A2: Boshlang'ich\n"
+        "🟡 B1\\-B2: O'rta\n"
         "🔴 C1: Yuqori\n\n"
         "*Eslatma:* Darajani oshirish test va XP orqali avtomatik bo'ladi.",
         parse_mode="MarkdownV2",
@@ -136,7 +136,7 @@ async def settings_set_level(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     user = db.get_or_create_user(user_id)
     await query.edit_message_text(
-        f"✅ *Daraja o'zgartirildi\!*\n\n"
+        f"✅ *Daraja o'zgartirildi\\!*\n\n"
         f"Joriy daraja: {esc_md(LEVEL_LABELS.get(level, level))}",
         parse_mode="MarkdownV2",
         reply_markup=settings_menu_keyboard(user),
@@ -151,7 +151,7 @@ async def settings_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await query.edit_message_text(
         "👩 *Ovoz tanlash*\n\n"
-        "TTS (matn \-\> ovoz) uchun ovoz tanlang:\n\n"
+        "TTS \\(matn \\-\\> ovoz\\) uchun ovoz tanlang:\n\n"
         "👩 *Katja* \\- Ayol ovozi\n"
         "👨 *Conrad* \\- Erkak ovozi",
         parse_mode="MarkdownV2",
@@ -173,7 +173,7 @@ async def settings_set_voice(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user = db.get_or_create_user(user_id)
     icon = "👩" if voice == "female" else "👨"
     await query.edit_message_text(
-        f"{icon} *Ovoz o'zgartirildi\!*\n\n"
+        f"{icon} *Ovoz o'zgartirildi\\!*\n\n"
         f"TTS ovozi: *{voice.capitalize()}*",
         parse_mode="MarkdownV2",
         reply_markup=settings_menu_keyboard(user),
@@ -189,11 +189,11 @@ async def settings_speed(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await query.edit_message_text(
         "⏩ *TTS Tezlik tanlash*\n\n"
         "Gapirish tezligini tanlang:\n\n"
-        "🐌 *0\.7x* \\- Sekin \- yangi o'rganuvchilar uchun\n"
-        "🚶 *0\.9x* \\- O'rtacha sekin\n"
-        "🏃 *1\.0x* \\- Normal \- standart\n"
-        "⚡ *1\.2x* \\- Tez \- mashq qilganlar uchun\n"
-        "🚀 *1\.5x* \\- Juda tez \- sinov uchun",
+        "🐌 *0\\.7x* \\- Sekin \\- yangi o'rganuvchilar uchun\n"
+        "🚶 *0\\.9x* \\- O'rtacha sekin\n"
+        "🏃 *1\\.0x* \\- Normal \\- standart\n"
+        "⚡ *1\\.2x* \\- Tez \\- mashq qilganlar uchun\n"
+        "🚀 *1\\.5x* \\- Juda tez \\- sinov uchun",
         parse_mode="MarkdownV2",
         reply_markup=speed_select_keyboard(),
     )
@@ -212,7 +212,7 @@ async def settings_set_speed(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     user = db.get_or_create_user(user_id)
     await query.edit_message_text(
-        f"⏩ *Tezlik o'zgartirildi\!*\n\n"
+        f"⏩ *Tezlik o'zgartirildi\\!*\n\n"
         f"TTS tezlik: *{speed}x*",
         parse_mode="MarkdownV2",
         reply_markup=settings_menu_keyboard(user),
