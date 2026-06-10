@@ -40,46 +40,59 @@ class EdgeTTS:
         rate_percent = int((speed - 1.0) * 100)
         rate_str = f"+{rate_percent}%" if rate_percent >= 0 else f"{rate_percent}%"
 
-        try:
-            communicate = edge_tts.Communicate(text, voice_name, rate=rate_str)
-            audio_chunks = []
-            async for chunk in communicate.stream():
-                if chunk["type"] == "audio":
-                    audio_chunks.append(chunk["data"])
-            if not audio_chunks:
-                logger.error("Edge TTS: audio chunk kelmadi")
-                return None
-            return b"".join(audio_chunks)
-        except Exception as e:
-            logger.error(f"Edge TTS xato: {e}")
-            return None
+        # 403 xatosida 2 marta qayta urinish
+        for attempt in range(3):
+            try:
+                communicate = edge_tts.Communicate(text, voice_name, rate=rate_str)
+                audio_chunks = []
+                async for chunk in communicate.stream():
+                    if chunk["type"] == "audio":
+                        audio_chunks.append(chunk["data"])
+                if not audio_chunks:
+                    logger.error("Edge TTS: audio chunk kelmadi")
+                    return None
+                return b"".join(audio_chunks)
+            except Exception as e:
+                logger.error(f"Edge TTS xato (urinish {attempt+1}/3): {e}")
+                if attempt < 2:
+                    await asyncio.sleep(1)
+                else:
+                    return None
 
     @staticmethod
     async def send_voice_message(update: Update, text: str, voice: str = "female",
                                   speed: float = 1.0, caption: str = None):
         """
         Telegram voice xabar yuborish (TTS orqali)
+        CallbackQuery yoki Message orqali ham ishlaydi.
         """
         import telegram
 
+        # CallbackQuery yoki Message dan to'g'ri message objectini olish
+        if update.callback_query:
+            message = update.callback_query.message
+        elif update.message:
+            message = update.message
+        else:
+            logger.error("send_voice_message: message topilmadi")
+            return False
+
         audio_bytes = await EdgeTTS.text_to_speech(text, voice, speed)
         if not audio_bytes:
-            await update.effective_message.reply_text(
-                "❌ Ovoz yaratishda xato yuz berdi."
-            )
+            await message.reply_text("❌ Ovoz yaratishda xato yuz berdi.")
             return False
 
         try:
             voice_file = telegram.InputFile(io.BytesIO(audio_bytes), filename="voice.mp3")
-            await update.effective_message.reply_voice(
+            await message.reply_voice(
                 voice=voice_file,
                 caption=caption or text[:200],
             )
             return True
         except Exception as e:
             logger.error(f"Voice xabar yuborish xatosi: {e}")
-            await update.effective_message.reply_text(
-                f"🔊 *{text}*\n\n_(Ovozli xabar yuborishda xato)\"",
+            await message.reply_text(
+                f"🔊 *{text}*\n\n_(Ovozli xabar yuborishda xato)_",
             )
             return False
 
