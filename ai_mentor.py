@@ -30,7 +30,7 @@ from voice_engine import speak_text, listen_to_voice, analyze_pronunciation
     VOICE_VOCAB_MENU, VOICE_VOCAB_CATEGORY, VOICE_VOCAB_PRACTICE, VOICE_VOCAB_RESULT,
     ROLEPLAY_MENU, ROLEPLAY_SCENARIO, ROLEPLAY_CHAT, ROLEPLAY_RESULT,
     AI_MENTOR_SETTINGS,
-) = range(15, 45)
+) = range(15, 43)
 
 
 # ==================== GROQ AI HELPER ====================
