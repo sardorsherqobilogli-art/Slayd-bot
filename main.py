@@ -59,6 +59,7 @@ from ai_mentor import (
     mistake_bank_menu, mistake_list, mistake_mini_lesson, mistake_practice, mistake_master, mistake_random,
     voice_vocab_menu, voice_vocab_category, voice_vocab_play_word, voice_vocab_process,
     roleplay_menu, roleplay_select, roleplay_chat, roleplay_result,
+    mistake_practice_process,
 )
 
 # Progress moduli
