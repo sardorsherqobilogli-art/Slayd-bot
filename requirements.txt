@@ -1,0 +1,24 @@
+# DEUTSCH MEISTER PRO - Dependencies
+# Python 3.10+
+
+# Core
+python-telegram-bot==21.9
+httpx==0.27.2
+
+# Database
+# sqlite3 (built-in)
+
+# Visualization
+matplotlib==3.9.0
+numpy==2.0.0
+
+# TTS (Edge TTS)
+edge-tts==6.1.19
+# Zaxira: gTTS
+gTTS==2.5.3
+
+# Environment
+python-dotenv==1.0.1
+
+# Deployment
+# Railway: BOT_TOKEN environment variable
