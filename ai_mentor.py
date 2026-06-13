@@ -2,13 +2,18 @@
 # -*- coding: utf-8 -*-
 """
 DEUTSCH MEISTER PRO - AI Mentor Moduli (TO'LIQ QAYTA YOZILGAN)
-Daraja aniqlash, Vorstellen, Erfahrungen, Xato banki,
+Daraja aniqlash, Vorstellen (vorstellen_complete.py bilan to'liq), Erfahrungen, Xato banki,
 Ovozli Lug'at (A1-B2, 20 mavzu, 25 so'z), Rolli O'yin (TELC/Goethe uslubi)
 """
 
 import json
 import random
 import httpx
+import os
+import logging
+import subprocess
+import tempfile
+from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -35,6 +40,14 @@ from voice_engine import speak_text, listen_to_voice, analyze_pronunciation
     ROLEPLAY_MENU, ROLEPLAY_LEVEL, ROLEPLAY_TOPIC, ROLEPLAY_RULES, ROLEPLAY_CHAT, ROLEPLAY_RESULT,
     AI_MENTOR_SETTINGS,
 ) = range(100, 139)
+
+# ── vorstellen_complete.py bilan mos STATE RAQAMLARI ─────────────────────────
+# main.py import qiladigan Vorstellen state'lari (200-202)
+VORSTELLEN_START    = 200   # Savollar davom etayotgan vaqt
+VORSTELLEN_FOLLOWUP = 201   # Ovoz qabul qilingandan keyin
+# VORSTELLEN_RESULT   = 202 — yuqorida range(100,139) da allaqachon 117 sifatida
+# Shuning uchun VORSTELLEN_RESULT = 117, lekin VS uchun 202 ham alias bo'lsin:
+VORSTELLEN_RESULT_VS = 202  # vs_ callback lar uchun (result page alias)
 
 
 # ==================== GROQ AI HELPERS ====================
