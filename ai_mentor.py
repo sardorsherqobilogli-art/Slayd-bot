@@ -1,97 +1,385 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-DEUTSCH MEISTER PRO - AI Mentor Moduli (TO'LIQ QAYTA YOZILGAN)
-Daraja aniqlash, Vorstellen, Erfahrungen, Xato banki,
-Ovozli Lug'at (A1-B2, 20 mavzu, 25 so'z), Rolli O'yin (TELC/Goethe uslubi)
+============================================================
+  DEUTSCH MEISTER PRO - Mukammal Nemis Tili Telegram Bot
+  TO'LIQ TUZATILGAN - ai_mentor.py (yangi versiya) bilan mos
+============================================================
 """
 
-import json
+import os
 import random
-import httpx
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler
+import datetime
+import logging
 
+from telegram import (
+    Update, InlineKeyboardButton, InlineKeyboardMarkup,
+    ReplyKeyboardMarkup, KeyboardButton,
+)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    ConversationHandler,
+)
+
+# ==================== MODULLAR ====================
 from config import (
-    logger, GROQ_API_KEY, GROQ_API_URL, DEFAULT_AI_MODEL,
-    LEVEL_DETECTION_QUESTIONS, VORSTELLEN_PROMPTS, ERFAHRUNGEN_TOPICS,
-    XP_REWARDS, LEVEL_LABELS,
+    logger, TOKEN, GROQ_API_KEY,
+    BOOK_LABELS, LEVEL_LABELS, LEVEL_BOOKS, BOOK_LEKTIONS, XP_REWARDS,
 )
 from database import get_db
-from voice_engine import speak_text, listen_to_voice, analyze_pronunciation
+from voice_engine import speak_text, listen_to_voice
 
-# ==================== STATES ====================
-(
+# ==================== AI MENTOR — TO'LIQ IMPORT (yangi versiyaga mos) ====================
+from ai_mentor import (
+    # ---- STATE RAQAMLARI ----
     AI_MENTOR_MENU,
     LEVEL_DETECT_Q1, LEVEL_DETECT_Q2, LEVEL_DETECT_Q3, LEVEL_DETECT_Q4, LEVEL_DETECT_Q5,
     LEVEL_DETECT_RESULT,
     VORSTELLEN_START, VORSTELLEN_FOLLOWUP, VORSTELLEN_RESULT,
-    ERFAHRUNGEN_MENU, ERFAHRUNGEN_TOPIC, ERFAHRUNGEN_DIFFICULTY, ERFAHRUNGEN_CHAT, ERFAHRUNGEN_RESULT,
+    ERFAHRUNGEN_MENU, ERFAHRUNGEN_TOPIC, ERFAHRUNGEN_DIFFICULTY,
+    ERFAHRUNGEN_CHAT, ERFAHRUNGEN_RESULT,
     MISTAKE_BANK_MENU, MISTAKE_REVIEW, MISTAKE_MINILESSON, MISTAKE_PRACTICE,
     VOICE_VOCAB_MENU, VOICE_VOCAB_LEVEL, VOICE_VOCAB_TOPIC, VOICE_VOCAB_WORDS,
     VOICE_VOCAB_TEST, VOICE_VOCAB_SPRECHEN,
-    ROLEPLAY_MENU, ROLEPLAY_LEVEL, ROLEPLAY_TOPIC, ROLEPLAY_RULES, ROLEPLAY_CHAT, ROLEPLAY_RESULT,
+    ROLEPLAY_MENU, ROLEPLAY_LEVEL, ROLEPLAY_TOPIC, ROLEPLAY_RULES,
+    ROLEPLAY_CHAT, ROLEPLAY_RESULT,
     AI_MENTOR_SETTINGS,
-) = range(15, 47)
+
+    # ---- HANDLERLAR ----
+    ai_mentor_menu_handler,
+
+    # Level detection
+    level_detect_start,
+    level_detect_process,
+    ld_show_section,
+    ld_speak_handler,
+
+    # Vorstellen
+    vorstellen_start,
+    vorstellen_process,
+    vs_show_section,
+    vs_speak_handler,
+
+    # Erfahrungen
+    erfahrungen_menu,
+    erfahrungen_topic,
+    erfahrungen_start_chat,
+    erfahrungen_chat,
+    erfahrungen_result,
+
+    # Mistake bank
+    mistake_bank_menu,
+    mistake_list,
+    mistake_mini_lesson,
+    mistake_speak_handler,
+    mistake_improve_handler,
+    mistake_practice,
+    mistake_practice_process,
+    mistake_master,
+    mistake_random,
+
+    # Voice vocab (yangi nomlar)
+    voice_vocab_menu,
+    voice_vocab_level_select,
+    voice_vocab_topic_select,
+    vocab_test_start,
+    vocab_test_process,
+    vocab_sprechen,
+    vocab_speak_story,
+    vocab_sprechen_ready,
+    vocab_sprechen_process,
+    vocab_roleplay_from_vocab,
+
+    # Roleplay (yangi nomlar)
+    roleplay_menu,
+    roleplay_level_select,
+    roleplay_topic_select,
+    roleplay_start_dialog,
+    roleplay_chat,
+    roleplay_result,
+
+    # Groq helper (tarjimon uchun)
+    groq_chat,
+)
+
+# Progress moduli
+from progress import (
+    progress_menu, progress_charts, progress_missions, progress_levelup,
+)
+
+# Settings moduli
+from settings import (
+    settings_menu, settings_level, settings_set_level,
+    settings_voice, settings_set_voice,
+    settings_speed, settings_set_speed, settings_mistakes,
+)
 
 
-# ==================== GROQ AI HELPERS ====================
+# ==================== PASTKI DOIMIY MENYU ====================
+REPLY_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        ["📚 Menyu", "📖 Kunlik so'z"],
+        ["🤖 AI Mentor", "📊 Progressim"],
+        ["🌐 Tarjimon", "ℹ️ Yordam"],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
 
-async def groq_chat(messages: list, max_tokens: int = 1024, temperature: float = 0.7) -> str:
-    """Groq LLM orqali suhbat"""
-    if not GROQ_API_KEY:
-        return "❌ AI xizmati vaqtincha mavjud emas."
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                GROQ_API_URL,
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": DEFAULT_AI_MODEL,
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                    "messages": messages,
-                },
+
+# ==================== STATES ====================
+(
+    MAIN_MENU,
+    LEVEL_SELECT,
+    A1_MENU, A2_MENU, B1_MENU, B2_MENU, C1_MENU,
+    BOOK_MENU,
+    LEKTION_PAGE,
+    TRANSLATOR,
+    QUIZ_STATE,
+    POMODORO_STATE,
+    UZB_DEU_INPUT,
+    DEU_UZB_INPUT,
+    # Onboarding
+    REG_PHONE,
+    REG_CHANNEL,
+    # Admin
+    ADMIN_STATE,
+) = range(17)
+
+# ==================== ADMIN CONFIG ====================
+ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "0").split(",") if x.strip().isdigit()]
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "sprechenmitspass")
+CHANNEL_LINK = f"https://t.me/{CHANNEL_USERNAME}"
+
+
+
+# ==================== KEYBOARD & STATE HELPERS ====================
+async def clear_last_keyboard(context, chat_id):
+    """Eski inline keyboardni o'chirish (tugmachalar chalkashmasligi uchun)"""
+    last_msg_id = context.user_data.get("last_inline_msg_id")
+    if last_msg_id and chat_id:
+        try:
+            await context.bot.edit_message_reply_markup(
+                chat_id=chat_id, message_id=last_msg_id, reply_markup=None
             )
-            data = resp.json()
-            return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        logger.error(f"Groq chat xatosi: {e}")
-        return "❌ AI javobida xato yuz berdi. Qayta urinib ko'ring."
+        except Exception:
+            pass  # Xabar allaqachon o'chirilgan yoki keyboard yo'q
 
 
-async def groq_json(messages: list, max_tokens: int = 1024) -> dict:
-    """Groq dan JSON formatida javob olish"""
-    if not GROQ_API_KEY:
-        return {"error": "AI xizmati o'chirilgan"}
+def save_message_id(context, message_id):
+    """Oxirgi inline keyboard xabar ID sini saqlash"""
+    if message_id:
+        context.user_data["last_inline_msg_id"] = message_id
+
+
+def set_user_state(context, state: int, state_name: str = ""):
+    """Foydalanuvchi state'ini kuzatish (debug uchun)"""
+    context.user_data["current_state"] = state
+    if state_name:
+        context.user_data["current_state_name"] = state_name
+
+# ==================== CALLBACK CONSTANTS ====================
+class CB:
+    MAIN_MENU = "main_menu"
+    LEVEL_SELECT = "level_select"
+    LEVEL_A1 = "level_a1"
+    LEVEL_A2 = "level_a2"
+    LEVEL_B1 = "level_b1"
+    LEVEL_B2 = "level_b2"
+    LEVEL_C1 = "level_c1"
+    B1_PREP = "b1_prep"
+    B2_PREP = "b2_prep"
+    C1_PREP = "c1_prep"
+    TRANSLATOR = "translator"
+    UZB_DEU = "uzb_deu"
+    DEU_UZB = "deu_uzb"
+    HELP = "help"
+    QUIZ_KNOW = "quiz_know"
+    QUIZ_DONTKNOW = "quiz_dontknow"
+    QUIZ_REPEAT = "quiz_repeat"
+    POMODORO_25 = "pomodoro_25"
+    POMODORO_STOP = "pomodoro_stop"
+    AI_MENTOR = "ai_mentor"
+    AI_MENTOR_MENU = "ai_mentor_menu"
+    AI_LEVEL_DETECT = "ai_level_detect"
+    AI_VORSTELLEN = "ai_vorstellen"
+    AI_ERFAHRUNGEN = "ai_erfahrungen"
+    AI_MISTAKE_BANK = "ai_mistake_bank"
+    AI_VOICE_VOCAB = "ai_voice_vocab"
+    AI_ROLEPLAY = "ai_roleplay"
+    PROGRESS = "progress"
+    PROGRESS_MENU = "progress_menu"
+    PROGRESS_CHARTS = "progress_charts"
+    PROGRESS_MISSIONS = "progress_missions"
+    PROGRESS_LEVELUP = "progress_levelup"
+    SETTINGS = "settings"
+    SETTINGS_MENU = "settings_menu"
+    SETTINGS_LEVEL = "set_level"
+    SETTINGS_VOICE = "set_voice"
+    SETTINGS_SPEED = "set_speed"
+    SETTINGS_MISTAKES = "set_mistakes"
+
+
+# ==================== LEKTSIYA YUKLASH ====================
+A1_MOTIVE_LEKTIONS = {}
+
+
+def load_lessons():
+    global A1_MOTIVE_LEKTIONS
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                GROQ_API_URL,
-                headers={
-                    "Authorization": f"Bearer {GROQ_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": DEFAULT_AI_MODEL,
-                    "max_tokens": max_tokens,
-                    "messages": messages,
-                    "response_format": {"type": "json_object"},
-                },
+        from lektion_data import A1_MOTIVE_LEKTIONS as loaded_lessons
+        A1_MOTIVE_LEKTIONS = loaded_lessons
+        logger.info(f"✅ {len(A1_MOTIVE_LEKTIONS)} lektsiya yuklandi")
+    except ImportError:
+        logger.warning("⚠️ lektion_data.py topilmadi.")
+        A1_MOTIVE_LEKTIONS = {}
+
+
+def get_lektion_text(level: str, book: str, n: int) -> str:
+    if level == "a1" and book == "motive" and n in A1_MOTIVE_LEKTIONS:
+        return A1_MOTIVE_LEKTIONS[n]
+    label = BOOK_LABELS.get(book, book)
+    level_label = LEVEL_LABELS.get(level, level)
+    return (
+        f"{level_label} | {label}\n"
+        f"📖 *Lektion {n}*\n\n"
+        f"⏳ Bu lektion materiallari tez orada qo'shiladi\\!\n\n"
+        f"📌 Hozircha A1 Motive lektsiyalari to'liq mavjud."
+    )
+
+
+def parse_words(level: str, book: str, n: int) -> list:
+    if level == "a1" and book == "motive" and n in A1_MOTIVE_LEKTIONS:
+        raw = A1_MOTIVE_LEKTIONS[n]
+    else:
+        return []
+    words = []
+    for line in raw.split("\n"):
+        line = line.strip()
+        for emoji in ["🔸", "🔹"]:
+            line = line.replace(emoji, "").strip()
+        if " - " in line:
+            parts = line.split(" - ", 1)
+            if len(parts) == 2:
+                german = parts[0].strip()
+                uzbek = parts[1].strip()
+                if german and uzbek:
+                    words.append((german, uzbek))
+    return words
+
+
+# ==================== KEYBOARD HELPERS ====================
+
+def main_menu_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤖 AI Mentor", callback_data=CB.AI_MENTOR_MENU)],
+        [InlineKeyboardButton("📚 Daraja tanlash (A1-C1)", callback_data=CB.LEVEL_SELECT)],
+        [
+            InlineKeyboardButton("📗 B1 Vorbereitung", callback_data=CB.B1_PREP),
+            InlineKeyboardButton("📙 B2 Vorbereitung", callback_data=CB.B2_PREP),
+        ],
+        [
+            InlineKeyboardButton("📕 C1 Vorbereitung", callback_data=CB.C1_PREP),
+            InlineKeyboardButton("🌐 Tarjimon", callback_data=CB.TRANSLATOR),
+        ],
+        [
+            InlineKeyboardButton("📊 Mening progressim", callback_data=CB.PROGRESS_MENU),
+            InlineKeyboardButton("⚙️ Sozlamalar", callback_data=CB.SETTINGS_MENU),
+        ],
+        [InlineKeyboardButton("ℹ️ Yordam", callback_data=CB.HELP)],
+    ])
+
+
+def level_select_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🟢 A1 - Beginner", callback_data=CB.LEVEL_A1),
+            InlineKeyboardButton("🟢 A2 - Elementary", callback_data=CB.LEVEL_A2),
+        ],
+        [
+            InlineKeyboardButton("🟡 B1 - Intermediate", callback_data=CB.LEVEL_B1),
+            InlineKeyboardButton("🟡 B2 - Upper-Interm.", callback_data=CB.LEVEL_B2),
+        ],
+        [InlineKeyboardButton("🔴 C1 - Advanced", callback_data=CB.LEVEL_C1)],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+
+def books_keyboard(level: str):
+    books = LEVEL_BOOKS.get(level, [])
+    rows = []
+    for book in books:
+        rows.append([InlineKeyboardButton(
+            BOOK_LABELS.get(book, book),
+            callback_data=f"book_{level}_{book}"
+        )])
+    rows.append([InlineKeyboardButton("↩️ Darajaga qaytish", callback_data=CB.LEVEL_SELECT)])
+    rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
+    return InlineKeyboardMarkup(rows)
+
+
+def lektions_keyboard(level: str, book: str):
+    key = f"{level}_{book}"
+    start, end = BOOK_LEKTIONS.get(key, (1, 8))
+    nums = list(range(start, end + 1))
+    rows = []
+    for i in range(0, len(nums), 2):
+        pair = nums[i:i+2]
+        row = [
+            InlineKeyboardButton(
+                f"Lektion {n}",
+                callback_data=f"lekt_{level}_{book}_{n}"
             )
-            data = resp.json()
-            result = data["choices"][0]["message"]["content"]
-            return json.loads(result)
-    except Exception as e:
-        logger.error(f"Groq JSON xatosi: {e}")
-        return {"error": str(e)}
+            for n in pair
+        ]
+        rows.append(row)
+    rows.append([InlineKeyboardButton("↩️ Kitobga qaytish", callback_data=f"back_book_{level}")])
+    rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
+    return InlineKeyboardMarkup(rows)
+
+
+def back_to_main_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)]
+    ])
+
+
+def translator_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇺🇿 UZB ➡️ 🇩🇪 DEU", callback_data=CB.UZB_DEU),
+            InlineKeyboardButton("🇩🇪 DEU ➡️ 🇺🇿 UZB", callback_data=CB.DEU_UZB),
+        ],
+        [InlineKeyboardButton("🤖 AI Tahlil", callback_data="translator_ai_analysis")],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+
+def quiz_card_keyboard():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Bildim", callback_data=CB.QUIZ_KNOW),
+            InlineKeyboardButton("❌ Bilmadim", callback_data=CB.QUIZ_DONTKNOW),
+        ],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+
+
+def quiz_result_keyboard(level: str, book: str, n: int, has_wrong: bool):
+    rows = []
+    if has_wrong:
+        rows.append([InlineKeyboardButton("🔁 Bilmaganlarni takrorlash", callback_data=CB.QUIZ_REPEAT)])
+    rows.append([InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")])
+    rows.append([InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)])
+    return InlineKeyboardMarkup(rows)
 
 
 def esc_md(text: str) -> str:
-    """MarkdownV2 escape"""
     if not text:
         return ""
     for ch in r"\_*[]()~`>#+-=|{}.!":
@@ -99,1767 +387,1155 @@ def esc_md(text: str) -> str:
     return text
 
 
-# ==================== MA'LUMOTLAR ====================
+# ==================== QUIZ HELPERS ====================
 
-# Ovozli lug'at mavzulari (daraja bo'yicha)
-VOCAB_TOPICS = {
-    "a1": [
-        "Begrüßung", "Familie", "Essen", "Reisen", "Wohnung",
-        "Arbeit", "Freizeit", "Schule", "Einkaufen", "Gesundheit",
-        "Wetter", "Tiere", "Farben", "Zahlen", "Zeit",
-        "Kleidung", "Körper", "Stadt", "Natur", "Hobbys",
-    ],
-    "a2": [
-        "Urlaub", "Berufe", "Kommunikation", "Verkehr", "Feste und Feiern",
-        "Medien", "Sport", "Umwelt", "Reise planen", "Restaurant",
-        "Bank", "Post", "Arzt", "Wohnungssuche", "Bewerbung",
-        "Schule und Uni", "Kultur", "Politik einfach", "Geschichte einfach", "Technologie einfach",
-    ],
-    "b1": [
-        "Gesellschaft", "Bildung", "Wirtschaft", "Klimawandel", "Migration",
-        "Gesundheitssystem", "Arbeitswelt", "Digitalisierung", "Globalisierung", "Stadtentwicklung",
-        "Generationen", "Medien und Werbung", "Konsum", "Jugendkultur", "Ehrenamt",
-        "Sport und Gesellschaft", "Ernährung und Trends", "Sprachlernen", "Interkulturalität", "Reisen und Tourismus",
-    ],
-    "b2": [
-        "Nachhaltigkeit", "Demokratie", "Menschenrechte", "Künstliche Intelligenz", "Bioethik",
-        "Wirtschaftspolitik", "Sozialsysteme", "Kulturelle Identität", "Literatur und Kunst", "Wissenschaft",
-        "Urbanisierung", "Gleichstellung", "Medizinische Forschung", "Digitale Transformation", "Internationale Beziehungen",
-        "Klimapolitik", "Philosophie des Alltags", "Finanzwelt", "Bildungspolitik", "Sprache und Macht",
-    ],
-}
-
-# Rolli o'yin mavzulari (daraja bo'yicha)
-ROLEPLAY_TOPICS = {
-    "a1": [
-        "Geburtstag feiern", "Picknick planen", "Freunde einladen", "Einkaufen gehen",
-        "Ausflug machen", "Kino besuchen", "Kochen zusammen", "Park besuchen",
-        "Bibliothek", "Spielplatz", "Museum", "Zoo",
-        "Schwimmbad", "Café treffen", "Spaziergang", "Gartenarbeit",
-        "Hausaufgaben", "Aufräumen", "Backen", "Sport treiben",
-    ],
-    "a2": [
-        "Klassenfahrt planen", "Sportevent organisieren", "Geburtstagsparty", "Urlaub buchen",
-        "Wohnung renovieren", "Schulausflug", "Kulturveranstaltung", "Familienfest",
-        "Grillparty", "Vereinstreffen", "Sommerfest", "Jugendprojekt",
-        "Stadtbesichtigung", "Flohmarkt", "Freiwilligenarbeit", "Filmabend",
-        "Lesekreis", "Kochkurs", "Tanzveranstaltung", "Weihnachtsfeier",
-    ],
-    "b1": [
-        "Gemeindeprojekt", "Umweltaktion", "Stadtfest organisieren", "Vereinsgründung",
-        "Schulprojekt", "Fundraising", "Berufsmesse", "Integrationsprojekt",
-        "Kulturprojekt", "Nachbarschaftshilfe", "Sportturnier", "Musikveranstaltung",
-        "Theaterstück", "Ausstellung", "Konferenz", "Workshop",
-        "Seminartag", "Projektpräsentation", "Teambuilding", "Abschlussfest",
-    ],
-    "b2": [
-        "Internationale Konferenz", "Politisches Forum", "Wissenschaftsprojekt", "Unternehmensstrategie",
-        "Stadtplanung", "Soziales Projekt", "Kultureller Austausch", "Bildungsreform",
-        "Umweltschutzprojekt", "Medienproduktion", "Digitales Projekt", "Forschungsprojekt",
-        "NGO Gründung", "Wirtschaftsprojekt", "Integrationsprogramm", "Kunstprojekt",
-        "Literarisches Projekt", "Historisches Projekt", "Philosophische Diskussion", "Innovationsprojekt",
-    ],
-}
-
-# Rolli o'yin punktlari (mavzuga mos)
-ROLEPLAY_PUNKTE = {
-    "default": [
-        "Wo? — Qayerda bo'ladi?",
-        "Wann? — Qachon bo'ladi?",
-        "Wer kommt? — Kim keladi?",
-        "Was mitbringen? — Nima olib kelish?",
-        "Wie viel kostet es? — Qancha turadi?",
-    ]
-}
-
-LEVEL_EMOJI = {"a1": "🟢", "a2": "🟢", "b1": "🟡", "b2": "🟡", "c1": "🔵"}
+def get_quiz_state(context):
+    return context.user_data.get("quiz", {})
 
 
-# ==================== KEYBOARDS ====================
-
-def ai_mentor_menu_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🎯 Darajani aniqlash", callback_data="ai_level_detect")],
-        [InlineKeyboardButton("🎤 Vorstellen (Taqdimot)", callback_data="ai_vorstellen")],
-        [InlineKeyboardButton("💬 Erfahrungen (B2/C1)", callback_data="ai_erfahrungen")],
-        [InlineKeyboardButton("🔧 Mening xato bankim", callback_data="ai_mistake_bank")],
-        [InlineKeyboardButton("📚 Ovozli lug'at", callback_data="ai_voice_vocab")],
-        [InlineKeyboardButton("🎭 Rolli o'yinlar", callback_data="ai_roleplay")],
-        [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
-    ])
+def set_quiz_state(context, data: dict):
+    context.user_data["quiz"] = data
 
 
-def three_section_keyboard(prefix: str, extra_buttons: list = None):
-    """Tushuntirish | Tarjima | Yaxshilash tugmalari"""
-    rows = [
-        [
-            InlineKeyboardButton("💡 Tushuntirish", callback_data=f"{prefix}_tushuntirish"),
-            InlineKeyboardButton("🌐 Tarjima", callback_data=f"{prefix}_tarjima"),
-            InlineKeyboardButton("✅ Yaxshilash", callback_data=f"{prefix}_yaxshilash"),
-        ],
-        [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"{prefix}_speak")],
-    ]
-    if extra_buttons:
-        rows.extend(extra_buttons)
-    return InlineKeyboardMarkup(rows)
+async def show_quiz_card(query, context):
+    q = get_quiz_state(context)
+    words = q.get("words", [])
+    idx = q.get("index", 0)
 
+    if idx >= len(words):
+        wrong = q.get("wrong", [])
+        total = q.get("total", 0)
+        correct = total - len(wrong)
+        level = q.get("level", "a1")
+        book = q.get("book", "motive")
+        n = q.get("n", 1)
 
-def level_select_keyboard(callback_prefix: str):
-    """A1/A2/B1/B2 daraja tanlash"""
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🟢 A1", callback_data=f"{callback_prefix}_a1"),
-            InlineKeyboardButton("🟢 A2", callback_data=f"{callback_prefix}_a2"),
-        ],
-        [
-            InlineKeyboardButton("🟡 B1", callback_data=f"{callback_prefix}_b1"),
-            InlineKeyboardButton("🟡 B2", callback_data=f"{callback_prefix}_b2"),
-        ],
-        [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-    ])
+        wrong_text = ""
+        if wrong:
+            wrong_lines = "\n".join([f"• {esc_md(g)} — {esc_md(u)}" for g, u in wrong])
+            wrong_text = f"\n\n❌ *Bilmaganlar:*\n{wrong_lines}"
 
-
-def topics_keyboard(topics: list, callback_prefix: str):
-    """Mavzular ro'yxati (2 ustunli)"""
-    rows = []
-    for i in range(0, len(topics), 2):
-        row = [InlineKeyboardButton(topics[i], callback_data=f"{callback_prefix}_{i}")]
-        if i + 1 < len(topics):
-            row.append(InlineKeyboardButton(topics[i + 1], callback_data=f"{callback_prefix}_{i+1}"))
-        rows.append(row)
-    rows.append([InlineKeyboardButton("↩️ Orqaga", callback_data="ai_mentor_menu")])
-    return InlineKeyboardMarkup(rows)
-
-
-# ==================== 1. LEVEL DETECTION ====================
-
-async def level_detect_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Daraja aniqlashni boshlash"""
-    query = update.callback_query
-    await query.answer()
-
-    context.user_data["level_detect"] = {
-        "answers": [],
-        "hints_used": [],
-        "current_q": 0,
-    }
-
-    question = LEVEL_DETECTION_QUESTIONS[0]
-    await query.edit_message_text(
-        f"🎯 *Darajani aniqlash* \\(5 ta savol\\)\n\n"
-        f"*Savol 1/5:*\n{esc_md(question['question'])}\n\n"
-        f"💡 Yordam uchun: `Yordam` deb yozing\n"
-        f"📝 Yozma YOKI 🎙️ ovozli javob bering\\!",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="level_skip_0")],
-            [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
-        ])
-    )
-    return LEVEL_DETECT_Q1
-
-
-async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Daraja aniqlash savolini qayta ishlash — matn YOKI ovoz"""
-    user_data = context.user_data.get("level_detect", {})
-    q_idx = user_data.get("current_q", 0)
-
-    # Callback (o'tkazib yuborish)
-    if update.callback_query:
-        query = update.callback_query
-        await query.answer()
-        if query.data.startswith("level_skip_"):
-            user_data["answers"].append({"skipped": True, "correct": False, "answer": ""})
-            q_idx += 1
-            user_data["current_q"] = q_idx
-            if q_idx >= len(LEVEL_DETECTION_QUESTIONS):
-                return await _level_detect_show_result(query, context, via_callback=True)
-            question = LEVEL_DETECTION_QUESTIONS[q_idx]
-            await query.edit_message_text(
-                f"🎯 *Savol {q_idx + 1}/5*\n\n{esc_md(question['question'])}\n\n"
-                f"📝 Javobingizni yozing yoki 🎙️ ovoz yuboring:",
-                parse_mode="MarkdownV2",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"level_skip_{q_idx}")],
-                ])
-            )
-            return LEVEL_DETECT_Q1 + min(q_idx, 4)
-        return LEVEL_DETECT_Q1
-
-    # Ovozli javob
-    if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-        user_text = await listen_to_voice(update)
-        await loading.delete()
-    elif update.message and update.message.text:
-        user_text = update.message.text.strip()
-    else:
-        return LEVEL_DETECT_Q1 + min(q_idx, 4)
-
-    # Yordam
-    question = LEVEL_DETECTION_QUESTIONS[q_idx]
-    if user_text.lower() in ["yordam", "help", "?"]:
-        hints = "\n".join([f"💡 {h}" for h in question.get("hints", [])])
-        user_data["hints_used"].append(q_idx)
-        await update.message.reply_text(
-            f"🎯 *Savol {q_idx + 1}/5*\n\n{esc_md(question['question'])}\n\n"
-            f"*Yordam:*\n{hints}\n\nEndi javobingizni yozing:",
-            parse_mode="MarkdownV2",
+        text = (
+            f"🏁 *Test tugadi\\!*\n\n"
+            f"✅ Bildim: {correct}/{total}\n"
+            f"❌ Bilmadim: {len(wrong)}/{total}"
+            + wrong_text
         )
-        return LEVEL_DETECT_Q1 + min(q_idx, 4)
+        await query.edit_message_text(
+            text, parse_mode="MarkdownV2",
+            reply_markup=quiz_result_keyboard(level, book, n, bool(wrong))
+        )
+        user_id = query.from_user.id
+        db = get_db()
+        db.add_xp(user_id, XP_REWARDS["flashcard_correct"] * correct, "flashcard", f"{correct}/{total}")
+        if len(wrong) == 0:
+            db.add_xp(user_id, XP_REWARDS["quiz_perfect"], "quiz_perfect", f"Lektion {n}")
+        return QUIZ_STATE
 
-    # AI bilan tahlil + 3 tugma
-    result = await groq_json([
-        {"role": "system", "content": (
-            "Nemis tili o'qituvchisi. Foydalanuvchi javobini tahlil qil. "
-            "JSON formatida qaytargin: {"
-            '"tushuntirish": "xatolar va grammatika tushuntirish (o\'zbek tilida)",'
-            '"tarjima": "to\'g\'ri nemischa javob matni",'
-            '"yaxshilash": "yaxshilangan variant va maslahatlar",'
-            '"is_correct": true_yoki_false,'
-            '"level_hint": "A1 yoki A2 yoki B1 yoki B2 yoki C1"'
-            "}"
-        )},
-        {"role": "user", "content": f"Savol: {question['question']}\nJavob: {user_text}"}
+    german, uzbek = words[idx]
+    total = q.get("total", 0)
+    text = (
+        f"🧠 *Yodlash testi* — {idx+1}/{total}\n\n"
+        f"🇩🇪 *{esc_md(german)}*\n\n"
+        f"O'zbekcha tarjimasi qanday?"
+    )
+    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=quiz_card_keyboard())
+    return QUIZ_STATE
+
+
+# ==================== HANDLERS ====================
+
+async def check_channel_membership(user_id: int, context) -> bool:
+    try:
+        member = await context.bot.get_chat_member(
+            chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id
+        )
+        return member.status not in ["left", "kicked", "banned"]
+    except Exception:
+        return False
+
+
+async def ask_channel_subscribe(update, context) -> int:
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Kanalga o'tish →", url=CHANNEL_LINK)],
+        [InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_sub")],
     ])
+    msg = (
+        "🎯 *Bir qadam qoldi\\!*\n\n"
+        "Kanalimizga a'zo bo'ling — u yerda har kuni:\n"
+        "• 📖 Foydali materiallar\n"
+        "• 🎧 Audio darslar\n"
+        "• 💡 Nemis tili sirlari\n\n"
+        "_A'zo bo'lgach, Obunani tekshirish ni bosing\\._"
+    )
+    if update.message:
+        await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=keyboard)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=keyboard)
+    return REG_CHANNEL
 
-    is_correct = result.get("is_correct", False)
-    user_data["answers"].append({"answer": user_text, "correct": is_correct, "skipped": False})
 
-    # Natijani saqlash (tugmalar uchun)
-    context.user_data["ld_result"] = result
-    context.user_data["ld_speak_text"] = result.get("tarjima", user_text)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Botni boshlash. Har doim toza state bilan boshlaydi."""
+    # Oldingi state va keyboardlarni tozalash
+    context.user_data.clear()
+    user_id = update.effective_user.id
+    first_name = update.effective_user.first_name or "Do'stim"
+    db = get_db()
+    user = db.get_or_create_user(
+        user_id=user_id,
+        username=update.effective_user.username,
+        first_name=first_name,
+        last_name=update.effective_user.last_name,
+    )
+    if not user.get("phone"):
+        phone_btn = KeyboardButton("📱 Telefon raqamimni ulashish", request_contact=True)
+        kb = ReplyKeyboardMarkup([[phone_btn]], resize_keyboard=True, one_time_keyboard=True)
+        await update.message.reply_text(
+            f"👋 Salom, *{esc_md(first_name)}\\!*\n\n"
+            "Sprechen mit Spaß botiga xush kelibsiz\\! 🎉\n\n"
+            "Birga nemis tilini o'rganamiz — qiziqarli va samarali\\! 🇩🇪\n\n"
+            "Davom etish uchun telefon raqamingizni ulashing\\. 🔒",
+            parse_mode="MarkdownV2",
+            reply_markup=kb,
+        )
+        return REG_PHONE
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        return await ask_channel_subscribe(update, context)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return await _show_welcome(update, context, user, first_name)
 
-    status = "✅ *To'g'ri\\!*" if is_correct else "❌ *Noto'g'ri*"
 
+async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    contact = update.message.contact
+    if not contact:
+        await update.message.reply_text("Iltimos, pastdagi tugmani bosing 👇")
+        return REG_PHONE
+    user_id = update.effective_user.id
+    db = get_db()
+    try:
+        db.update_user_phone(user_id, contact.phone_number)
+    except Exception:
+        pass
+    await update.message.reply_text("✅ *Rahmat\\!* Raqamingiz saqlandi 🙏", parse_mode="MarkdownV2")
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        return await ask_channel_subscribe(update, context)
+    user = db.get_or_create_user(user_id)
+    first_name = update.effective_user.first_name or "Do'stim"
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return await _show_welcome(update, context, user, first_name)
+
+
+# ==================== TUZATISH: check_sub_handler ====================
+# Avvalgi versiyada bu handler ConversationHandler TASHQARISIDA edi,
+# shuning uchun REG_CHANNEL state da ishlamay xato berardi.
+# Endi bu funksiya ConversationHandler ichidagi REG_CHANNEL state ga qo'shildi.
+
+async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    user_id = query.from_user.id
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        await query.answer("❌ Hali a'zo emassiz! Kanalga kiring.", show_alert=True)
+        return REG_CHANNEL
+    await query.answer("✅ Tekshirildi!")
+    db = get_db()
+    user = db.get_or_create_user(user_id)
+    db.generate_daily_missions(user_id)
+    first_name = query.from_user.first_name or "Do'stim"
+    text = (
+        f"🎉 *Salom, {esc_md(first_name)}\\!* 🇩🇪\n\n"
+        "Sprechen mit Spaß ga xush kelibsiz\\!\n\n"
+        f"📊 Darajangiz: *{esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
+        "Qayerdan boshlaymiz\\? 👇"
+    )
+    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+    await query.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return MAIN_MENU
+
+
+async def _show_welcome(update, context, user, first_name) -> int:
+    db = get_db()
+    db.generate_daily_missions(update.effective_user.id)
+    text = (
+        f"🎉 *Salom, {esc_md(first_name)}\\!* 🇩🇪\n\n"
+        "Sprechen mit Spaß ga xush kelibsiz\\!\n\n"
+        f"📊 Darajangiz: *{esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
+        "Qayerdan boshlaymiz\\? 👇"
+    )
+    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+    await update.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return MAIN_MENU
+
+
+# ==================== KUNLIK SOZ ====================
+DAILY_WORDS = [
+    ("der Mut", "jasorat"), ("die Hoffnung", "umid"), ("das Glück", "baxt"),
+    ("die Freiheit", "erkinlik"), ("der Traum", "orzu"), ("die Stärke", "kuch"),
+    ("das Vertrauen", "ishonch"), ("die Geduld", "sabr"), ("der Erfolg", "muvaffaqiyat"),
+    ("die Liebe", "sevgi"), ("das Wissen", "bilim"), ("die Zeit", "vaqt"),
+    ("der Weg", "yo'l"), ("die Freundschaft", "do'stlik"), ("das Leben", "hayot"),
+    ("der Sommer", "yoz"), ("die Musik", "musiqa"), ("das Herz", "yurak"),
+    ("die Reise", "sayohat"), ("der Frieden", "tinchlik"),
+]
+
+async def daily_word_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    import datetime as dt
+    today = dt.date.today().toordinal()
+    word, meaning = DAILY_WORDS[today % len(DAILY_WORDS)]
     await update.message.reply_text(
-        f"{status}\n\n"
-        f"🎯 *Sizning javobingiz:* _{esc_md(user_text)}_\n\n"
-        f"Tahlilni tanlang:",
+        f"📖 *Bugungi so'z:*\n\n"
+        f"🇩🇪 *{esc_md(word)}*\n"
+        f"🇺🇿 _{esc_md(meaning)}_\n\n"
+        "_Bugun 5 marta ishlatib ko'ring\\!_ 💪",
         parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("💡 Tushuntirish", callback_data="ld_show_tushuntirish"),
-                InlineKeyboardButton("🌐 Tarjima", callback_data="ld_show_tarjima"),
-                InlineKeyboardButton("✅ Yaxshilash", callback_data="ld_show_yaxshilash"),
-            ],
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="ld_speak")],
-            [InlineKeyboardButton("➡️ Keyingi savol", callback_data=f"level_skip_{q_idx + 1}")],
-        ])
+        reply_markup=main_menu_keyboard(),
+    )
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return MAIN_MENU
+
+
+# ==================== ADMIN PANEL ====================
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        return
+    kb = ReplyKeyboardMarkup(
+        [["👥 Foydalanuvchilar", "🔍 Raqam izlash"], ["🏠 Asosiy menyu"]],
+        resize_keyboard=True,
+    )
+    db = get_db()
+    try:
+        total = db.get_user_count()
+    except Exception:
+        total = "?"
+    await update.message.reply_text(
+        f"🔐 *Admin Panel*\n\n👥 Jami: *{total}* ta\n\nBo'limni tanlang:",
+        parse_mode="MarkdownV2", reply_markup=kb,
     )
 
-    q_idx += 1
-    user_data["current_q"] = q_idx
-    return LEVEL_DETECT_Q1 + min(q_idx, 4)
+async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        return
+    db = get_db()
+    try:
+        users = db.get_all_users_for_admin()
+    except Exception:
+        await update.message.reply_text("❌ Xato.")
+        return
+    if not users:
+        await update.message.reply_text("Hali foydalanuvchilar yo'q.")
+        return
+    for i in range(0, len(users), 20):
+        chunk = users[i:i+20]
+        lines = [f"👥 *{i+1}\\-{min(i+20,len(users))} / {len(users)} ta*\n"]
+        for j, u in enumerate(chunk, i+1):
+            fname = esc_md(u.get("first_name") or "—")
+            phone = esc_md(u.get("phone") or "—")
+            tg = esc_md("@"+u["username"] if u.get("username") else "—")
+            lines.append(f"{j}\\. {fname} | 📱{phone} | {tg}")
+        await update.message.reply_text("\n".join(lines), parse_mode="MarkdownV2")
+
+async def admin_search_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    await update.message.reply_text("🔍 Telefon raqamini yozing:")
+    context.user_data["admin_search"] = True
+
+async def admin_search_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS or not context.user_data.get("admin_search"):
+        return
+    context.user_data["admin_search"] = False
+    q = update.message.text.strip()
+    db = get_db()
+    try:
+        users = db.search_by_phone(q)
+    except Exception:
+        users = []
+    if not users:
+        await update.message.reply_text(f"❌ '{q}' topilmadi.")
+        return
+    for u in users:
+        await update.message.reply_text(
+            f"✅ Topildi!\n👤 {u.get('first_name') or '—'}\n"
+            f"📱 {u.get('phone') or '—'}\n"
+            f"TG: {'@'+u['username'] if u.get('username') else '—'}"
+        )
 
 
-async def ld_show_section(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Level detect — 3 tugma natijasi ko'rsatish"""
+async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-
-    result = context.user_data.get("ld_result", {})
-    section = query.data.replace("ld_show_", "")
-
-    content_map = {
-        "tushuntirish": ("💡 *Tushuntirish*", result.get("tushuntirish", "Ma'lumot yo'q")),
-        "tarjima": ("🌐 *To'g'ri variant*", result.get("tarjima", "Ma'lumot yo'q")),
-        "yaxshilash": ("✅ *Yaxshilash tavsiyalari*", result.get("yaxshilash", "Ma'lumot yo'q")),
-    }
-
-    title, text = content_map.get(section, ("", ""))
-    q_idx = context.user_data.get("level_detect", {}).get("current_q", 1)
-
-    await query.edit_message_text(
-        f"{title}\n\n{esc_md(text)}",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("💡 Tushuntirish", callback_data="ld_show_tushuntirish"),
-                InlineKeyboardButton("🌐 Tarjima", callback_data="ld_show_tarjima"),
-                InlineKeyboardButton("✅ Yaxshilash", callback_data="ld_show_yaxshilash"),
-            ],
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="ld_speak")],
-            [InlineKeyboardButton("➡️ Keyingi savol", callback_data=f"level_skip_{q_idx}")],
-        ])
-    )
-    return LEVEL_DETECT_Q1 + min(max(q_idx - 1, 0), 4)
-
-
-async def ld_speak_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Level detect — ovozda o'qish"""
-    query = update.callback_query
-    await query.answer("🔊 Ovoz tayyorlanmoqda...")
-
-    speak_text_val = context.user_data.get("ld_speak_text", "")
-    if speak_text_val:
-        await speak_text(query, speak_text_val, voice="female", speed=0.9)
-
-    q_idx = context.user_data.get("level_detect", {}).get("current_q", 1)
-    return LEVEL_DETECT_Q1 + min(max(q_idx - 1, 0), 4)
-
-
-async def _level_detect_show_result(obj, context: ContextTypes.DEFAULT_TYPE, via_callback=False) -> int:
-    """Daraja aniqlash yakuniy natijasi"""
-    user_data = context.user_data.get("level_detect", {})
-    answers = user_data.get("answers", [])
-    correct_count = sum(1 for a in answers if a.get("correct", False))
-
-    if correct_count <= 1:
-        level = "a1"
-    elif correct_count <= 2:
-        level = "a2"
-    elif correct_count <= 3:
-        level = "b1"
-    elif correct_count <= 4:
-        level = "b2"
-    else:
-        level = "c1"
-
-    user_id = (obj.from_user.id if via_callback else obj.effective_user.id)
+    user_id = query.from_user.id
     db = get_db()
-    db.update_user(user_id, current_level=level)
-
-    level_desc = {
-        "a1": "Boshlang'ich daraja\\. A1 lektsiyalaridan boshlang\\! 📚",
-        "a2": "Elementar daraja\\. Asosiy grammatikani mustahkamlang\\! 📖",
-        "b1": "O'rta daraja\\. Muloqot va murakkab mavzularni o'rganing\\! 💬",
-        "b2": "Yuqori o'rta daraja\\. Akademik nemis tiliga o'ting\\! 🎓",
-        "c1": "Yuqori daraja\\. Professional darajada erkin muloqot\\! 🏆",
-    }
-
-    text = (
-        f"🎯 *Daraja aniqlash natijasi*\n\n"
-        f"✅ To'g'ri: {correct_count}/5\n"
-        f"💡 Yordam: {len(user_data.get('hints_used', []))} ta\n\n"
-        f"📊 *Sizning darajangiz: {esc_md(LEVEL_LABELS.get(level, level.upper()))}*\n\n"
-        f"{level_desc.get(level, '')}"
+    user = db.get_or_create_user(user_id)
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
+    await query.edit_message_text(
+        "🏠 *Asosiy Menu*\n\n"
+        f"📊 Daraja: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}\n"
+        f"⭐ XP: {esc_md(str(user.get('total_xp', 0)))}\n\n"
+        "Bo'limni tanlang:",
+        parse_mode="MarkdownV2",
+        reply_markup=main_menu_keyboard(),
     )
-
-    if via_callback:
-        await obj.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
-    else:
-        await obj.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
-    return AI_MENTOR_MENU
+    return MAIN_MENU
 
 
-# ==================== 2. VORSTELLEN ====================
-
-async def vorstellen_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen boshlash"""
+async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-
-    context.user_data["vorstellen"] = {"messages": [], "step": 0}
-
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     await query.edit_message_text(
-        "🎤 *Vorstellen \\- O'zingizni taqdim etish*\n\n"
-        "Men sizga 3 ta savol beraman\\! Nemischa yozing yoki ovoz yuboring\\!\n\n"
-        "*1\\-savol:*\n"
-        "Stellen Sie sich vor\\! \\(O'zingizni taqdim eting\\!\\)\n\n"
-        "Ismingiz, yoshingiz, qayerdanligingiz, nima ish qilishingiz haqida ayting\\!",
+        "📚 *Daraja tanlash*\n\n"
+        "O'z darajangizni tanlang:\n"
+        "🟢 A1\\-A2: Boshlang'ich\n"
+        "🟡 B1\\-B2: O'rta\n"
+        "🔴 C1: Yuqori",
         parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_finish")],
-        ])
+        reply_markup=level_select_keyboard(),
     )
-    return VORSTELLEN_START
+    return LEVEL_SELECT
 
 
-async def vorstellen_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen javobini qayta ishlash"""
-    v_data = context.user_data.get("vorstellen", {"step": 0, "messages": []})
-    step = v_data["step"]
-
-    if update.callback_query and update.callback_query.data == "vorstellen_finish":
-        await update.callback_query.answer()
-        return await vorstellen_result(update, context, v_data)
-
-    # Ovozli javob
-    if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-        user_text = await listen_to_voice(update)
-        await loading.delete()
-    elif update.message and update.message.text:
-        user_text = update.message.text.strip()
-    else:
-        return VORSTELLEN_START
-
-    v_data["messages"].append({"role": "user", "content": user_text})
-    step += 1
-    v_data["step"] = step
-
-    if step >= 3:
-        return await vorstellen_result(update, context, v_data)
-
-    follow_up_list = VORSTELLEN_PROMPTS.get("follow_up", [
-        "Erzählen Sie mehr über Ihre Familie!",
-        "Was sind Ihre Hobbys?",
-    ])
-    follow_up = follow_up_list[min(step - 1, len(follow_up_list) - 1)]
-
-    await update.message.reply_text(
-        f"✅ *Juda yaxshi\\!*\n\n*Savol {step + 1}/3:*\n{esc_md(follow_up)}\n\n"
-        f"📝 Yozing yoki 🎙️ ovoz yuboring:",
+async def _show_books(query, level: str, context):
+    label = LEVEL_LABELS.get(level, level)
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
+    await query.edit_message_text(
+        f"{esc_md(label)}\n\nKitob tanlang:",
         parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="vorstellen_finish")],
-        ])
+        reply_markup=books_keyboard(level),
     )
-    return VORSTELLEN_START
+    state_map = {"a1": A1_MENU, "a2": A2_MENU, "b1": B1_MENU, "b2": B2_MENU, "c1": C1_MENU}
+    set_user_state(context, state_map.get(level, A1_MENU), f"{level.upper()}_MENU")
+    return state_map.get(level, A1_MENU)
 
 
-async def vorstellen_result(update: Update, context: ContextTypes.DEFAULT_TYPE, v_data: dict) -> int:
-    """Vorstellen natijasi — AI tahlil + 3 tugma"""
-    msg = update.message if update.message else None
-    cb = update.callback_query if update.callback_query else None
+async def level_a1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "a1", context)
 
-    loading_text = "🧠 *AI tahlil qilmoqda\\.\\.\\.*"
-    if cb:
-        await cb.edit_message_text(loading_text, parse_mode="MarkdownV2")
+
+async def level_a2_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "a2", context)
+
+
+async def level_b1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "b1", context)
+
+
+async def level_b2_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "b2", context)
+
+
+async def level_c1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "c1", context)
+
+
+async def b1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "b1", context)
+
+
+async def b2_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "b2", context)
+
+
+async def c1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    return await _show_books(query, "c1", context)
+
+
+async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
+    parts = query.data.split("_", 2)
+    if len(parts) < 3:
+        return MAIN_MENU
+    level, book = parts[1], parts[2]
+    key = f"{level}_{book}"
+    start, end = BOOK_LEKTIONS.get(key, (1, 8))
+    label = BOOK_LABELS.get(book, book)
+    level_label = LEVEL_LABELS.get(level, level)
+    await query.edit_message_text(
+        f"{esc_md(level_label)} \\| {esc_md(label)}\n\n"
+        f"Lektion tanlang \\({esc_md(str(start))}\\-{esc_md(str(end))}\\):",
+        parse_mode="MarkdownV2",
+        reply_markup=lektions_keyboard(level, book),
+    )
+    return BOOK_MENU
+
+
+async def back_book_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    level = query.data.split("_")[-1]
+    return await _show_books(query, level, context)
+
+
+async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
+    parts = query.data.split("_")
+    if len(parts) < 4:
+        return MAIN_MENU
+    level = parts[1]
+    n = int(parts[-1])
+    book = "_".join(parts[2:-1])
+    label = BOOK_LABELS.get(book, book)
+    level_label = LEVEL_LABELS.get(level, level)
+    content = get_lektion_text(level, book, n)
+
+    if content.startswith("🇩🇪"):
+        text = content
     else:
-        await msg.reply_text(loading_text, parse_mode="MarkdownV2")
-
-    all_text = "\n".join([m["content"] for m in v_data.get("messages", [])])
-
-    result = await groq_json([
-        {"role": "system", "content": (
-            "Siz nemis tili o'qituvchisisiz. Foydalanuvchi o'zini taqdim etdi. "
-            "JSON formatida tahlil bering: {"
-            '"score": 0_dan_10_gacha,'
-            '"tushuntirish": "xatolar va grammatika tushuntirish o\'zbek tilida",'
-            '"tarjima": "to\'g\'ri nemischa variant",'
-            '"yaxshilash": "yaxshilash tavsiyalari o\'zbek tilida",'
-            '"grammar_errors": [{"xato": "...", "togri": "..."}],'
-            '"vocabulary_score": 0_dan_10_gacha,'
-            '"fluency_score": 0_dan_10_gacha'
-            "}"
-        )},
-        {"role": "user", "content": f"Foydalanuvchi gaplari:\n{all_text}"},
-    ])
-
-    user_id = (cb.from_user.id if cb else update.effective_user.id)
-    db = get_db()
-
-    # Xatolarni DB ga saqlash
-    for error in result.get("grammar_errors", []):
-        if error.get("xato") and error.get("togri"):
-            db.add_mistake(
-                user_id=user_id,
-                user_input=error["xato"],
-                correct_form=error["togri"],
-                mistake_type="vorstellen_grammar",
-            )
-
-    db.add_xp(user_id, XP_REWARDS.get("voice_practice", 25), "vorstellen", f"Ball: {result.get('score', 5)}/10")
-
-    # Natijani saqlash
-    context.user_data["vs_result"] = result
-    context.user_data["vs_speak_text"] = result.get("tarjima", "")
-
-    score = result.get("score", 5)
-    text = (
-        f"🎤 *Vorstellen tahlili tayyor\\!*\n\n"
-        f"⭐ *Ball: {score}/10*\n"
-        f"📚 *So'z boyligi: {result.get('vocabulary_score', 5)}/10*\n"
-        f"🗣️ *Suvliklik: {result.get('fluency_score', 5)}/10*\n\n"
-        f"Quyidagi bo'limlardan birini tanlang:"
-    )
+        text = f"{esc_md(level_label)} \\| {esc_md(label)}\n📖 *Lektion {n}*\n\n{content}"
 
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("💡 Tushuntirish", callback_data="vs_show_tushuntirish"),
-            InlineKeyboardButton("🌐 Tarjima", callback_data="vs_show_tarjima"),
-            InlineKeyboardButton("✅ Yaxshilash", callback_data="vs_show_yaxshilash"),
+            InlineKeyboardButton("🧠 Yodlash", callback_data=f"quiz_start_{level}_{book}_{n}"),
+            InlineKeyboardButton("🍅 Pomodoro", callback_data=f"pomodoro_start_{level}_{book}_{n}"),
         ],
-        [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
-        [InlineKeyboardButton("🔁 Qayta urinish", callback_data="ai_vorstellen")],
-        [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
+        [InlineKeyboardButton("🎙️ Ovozda o'qish", callback_data=f"tts_lekt_{level}_{book}_{n}")],
+        [InlineKeyboardButton("↩️ Lektsiyalarga qaytish", callback_data=f"book_{level}_{book}")],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
     ])
-
-    if cb:
-        await cb.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-    else:
-        await msg.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-
-    return AI_MENTOR_MENU
+    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    set_user_state(context, BOOK_MENU, "BOOK_MENU")
+    return BOOK_MENU
 
 
-async def vs_show_section(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen — 3 tugma natijasi"""
+# ==================== QUIZ ====================
+
+async def quiz_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    parts = query.data.split("_")
+    level = parts[2]
+    n = int(parts[-1])
+    book = "_".join(parts[3:-1])
+    words = parse_words(level, book, n)
+    if not words:
+        await query.edit_message_text("⏳ Bu lektion uchun test hali mavjud emas.", reply_markup=back_to_main_keyboard())
+        return BOOK_MENU
+    random.shuffle(words)
+    set_quiz_state(context, {"words": words, "index": 0, "wrong": [], "total": len(words), "level": level, "book": book, "n": n})
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
+    return await show_quiz_card(query, context)
 
-    result = context.user_data.get("vs_result", {})
-    section = query.data.replace("vs_show_", "")
 
-    content_map = {
-        "tushuntirish": ("💡 *Tushuntirish*", result.get("tushuntirish", "Ma'lumot yo'q")),
-        "tarjima": ("🌐 *To'g'ri variant*", result.get("tarjima", "Ma'lumot yo'q")),
-        "yaxshilash": ("✅ *Yaxshilash tavsiyalari*", result.get("yaxshilash", "Ma'lumot yo'q")),
-    }
+async def quiz_know_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer("✅ Zo'r!")
+    q = get_quiz_state(context)
+    q["index"] += 1
+    set_quiz_state(context, q)
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
+    return await show_quiz_card(query, context)
 
-    title, text = content_map.get(section, ("", ""))
 
+async def quiz_dontknow_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    q = get_quiz_state(context)
+    words = q.get("words", [])
+    idx = q.get("index", 0)
+    if idx < len(words):
+        german, uzbek = words[idx]
+        await query.answer(f"❌ {uzbek}", show_alert=True)
+        q["wrong"].append((german, uzbek))
+    q["index"] += 1
+    set_quiz_state(context, q)
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
+    return await show_quiz_card(query, context)
+
+
+async def quiz_repeat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    q = get_quiz_state(context)
+    wrong = q.get("wrong", [])
+    if wrong:
+        random.shuffle(wrong)
+        set_quiz_state(context, {
+            "words": wrong, "index": 0, "wrong": [],
+            "total": len(wrong), "level": q.get("level", "a1"),
+            "book": q.get("book", "motive"), "n": q.get("n", 1),
+        })
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
+    return await show_quiz_card(query, context)
+
+
+# ==================== POMODORO ====================
+
+async def pomodoro_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split("_")
+    level = parts[2]
+    n = int(parts[-1])
+    book = "_".join(parts[3:-1])
+    end_time = datetime.datetime.now() + datetime.timedelta(minutes=25)
+    end_str = end_time.strftime("%H:%M")
+    context.user_data["pomodoro"] = {"level": level, "book": book, "n": n, "end": end_str}
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏹️ To'xtatish", callback_data=CB.POMODORO_STOP)],
+        [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
+    ])
     await query.edit_message_text(
-        f"{title}\n\n{esc_md(text)}",
+        f"🍅 *Pomodoro boshlandi\\!*\n\n"
+        f"⏱ 25 daqiqa o'qish vaqti\n"
+        f"🏁 Tugash: *{end_str}*\n\n"
+        f"Diqqatni jamlang va o'rganing\\! 💪",
+        parse_mode="MarkdownV2",
+        reply_markup=keyboard
+    )
+    return POMODORO_STATE
+
+
+async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    p = context.user_data.get("pomodoro", {})
+    level = p.get("level", "a1")
+    book = p.get("book", "motive")
+    n = p.get("n", 1)
+    user_id = query.from_user.id
+    db = get_db()
+    db.add_xp(user_id, XP_REWARDS["pomodoro_25min"], "pomodoro", f"Lektion {n}")
+    db.update_user(user_id, total_pomodoro_minutes=25)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+    ])
+    await query.edit_message_text(
+        f"⏹️ *Pomodoro to'xtatildi*\n\n"
+        f"🎁 *\\+{esc_md(str(XP_REWARDS['pomodoro_25min']))} XP*\n\n"
+        f"Yaxshi harakat\\! Davom eting 💪",
+        parse_mode="MarkdownV2",
+        reply_markup=keyboard
+    )
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return MAIN_MENU
+
+
+# ==================== TTS LEKTION ====================
+
+async def tts_lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    parts = query.data.split("_")
+    level = parts[2]
+    n = int(parts[-1])
+    book = "_".join(parts[3:-1])
+    words = parse_words(level, book, n)
+    if not words:
+        await query.answer("Bu lektsiya uchun so'zlar yo'q!")
+        return BOOK_MENU
+    sample = random.sample(words, min(10, len(words)))
+    text_to_speak = ". ".join([g for g, u in sample])
+    await query.edit_message_text(
+        f"🔊 *Lektion {n} \\- Ovozli o'qish*\n\n10 ta tasodifiy so'z eshiting\\.\\.\\.",
+        parse_mode="MarkdownV2",
+    )
+    await speak_text(query, text_to_speak, voice="female", speed=0.9)
+    await query.message.reply_text(
+        "🔊 Ovozli o'qish tugadi\\!\n\nYana tinglashni xohlaysizmi?",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("💡 Tushuntirish", callback_data="vs_show_tushuntirish"),
-                InlineKeyboardButton("🌐 Tarjima", callback_data="vs_show_tarjima"),
-                InlineKeyboardButton("✅ Yaxshilash", callback_data="vs_show_yaxshilash"),
-            ],
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
-            [InlineKeyboardButton("🔁 Qayta urinish", callback_data="ai_vorstellen")],
-            [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
+            [InlineKeyboardButton("🔁 Yana", callback_data=f"tts_lekt_{level}_{book}_{n}")],
+            [InlineKeyboardButton("↩️ Lektsiyaga qaytish", callback_data=f"lekt_{level}_{book}_{n}")],
         ])
     )
-    return AI_MENTOR_MENU
+    return BOOK_MENU
 
 
-async def vs_speak_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen — ovozda o'qish"""
-    query = update.callback_query
-    await query.answer("🔊 Ovoz tayyorlanmoqda...")
+# ==================== TARJIMON ====================
 
-    speak_text_val = context.user_data.get("vs_speak_text", "")
-    if speak_text_val:
-        await speak_text(query, speak_text_val, voice="female", speed=0.9)
-
-    return AI_MENTOR_MENU
-
-
-# ==================== 3. ERFAHRUNGEN ====================
-
-async def erfahrungen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Erfahrungen — faqat B2/C1"""
+async def translator_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    await query.edit_message_text(
+        "🌐 *Tarjimon*\n\n*Kontekst Tarjimon 2\\.0*\n\n"
+        "Qaysi yo'nalishda tarjima qilmoqchisiz?\n\n"
+        "🇺🇿➡️🇩🇪 O'zbek \\- Nemis\n"
+        "🇩🇪➡️🇺🇿 Nemis \\- O'zbek\n\n"
+        "AI grammatika tahlili bilan\\!",
+        parse_mode="MarkdownV2",
+        reply_markup=translator_keyboard(),
+    )
+    return TRANSLATOR
 
-    user_id = query.from_user.id
+
+async def uzb_deu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data["translator_dir"] = "uzb_deu"
+    await query.edit_message_text(
+        "🇺🇿➡️🇩🇪 *O'zbekcha \\-\\> Nemischa*\n\n"
+        "So'z, gap yoki matn yuboring\\!\n\n"
+        "✨ AI grammatika tahlili bilan tarjima\n\n"
+        "*Misol:* `Men 25 yoshdaman`",
+        parse_mode="MarkdownV2",
+        reply_markup=back_to_main_keyboard(),
+    )
+    return UZB_DEU_INPUT
+
+
+async def deu_uzb_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    context.user_data["translator_dir"] = "deu_uzb"
+    await query.edit_message_text(
+        "🇩🇪➡️🇺🇿 *Nemischa \\-\\> O'zbekcha*\n\n"
+        "So'z, gap yoki matn yuboring\\!\n\n"
+        "✨ AI grammatika tahlili bilan tarjima\n\n"
+        "*Misol:* `Ich bin 25 Jahre alt`",
+        parse_mode="MarkdownV2",
+        reply_markup=back_to_main_keyboard(),
+    )
+    return DEU_UZB_INPUT
+
+
+async def translation_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    word = update.message.text.strip()
+    if not word:
+        await update.message.reply_text("❗ Iltimos matn yuboring.")
+        return context.user_data.get("translator_state", UZB_DEU_INPUT)
+
+    direction = context.user_data.get("translator_dir", "uzb_deu")
+    loading_msg = await update.message.reply_text("⏳ Tarjima qilinmoqda...")
+
+    if direction == "uzb_deu":
+        flag_from, flag_to = "🇺🇿", "🇩🇪"
+        prompt = (
+            f"O'zbek tilidan nemis tiliga tarjima qil va grammatika tahlili ber:\n\"{word}\"\n\n"
+            f"Faqat JSON: {{\"translation\": \"nemischa\", \"grammar_analysis\": \"tahlil o'zbek tilida\", "
+            f"\"tips\": \"maslahat\", \"level\": \"A1/A2/B1/B2/C1\"}}"
+        )
+    else:
+        flag_from, flag_to = "🇩🇪", "🇺🇿"
+        prompt = (
+            f"Nemis tilidan o'zbek tiliga tarjima qil va grammatika tahlili ber:\n\"{word}\"\n\n"
+            f"Faqat JSON: {{\"translation\": \"o'zbekcha\", \"grammar_analysis\": \"tahlil o'zbek tilida\", "
+            f"\"tips\": \"maslahat\", \"level\": \"A1/A2/B1/B2/C1\"}}"
+        )
+
+    result = await groq_chat([
+        {"role": "system", "content": "Siz professional tarjimon va grammatika o'qituvchisisiz. JSON formatida javob bering."},
+        {"role": "user", "content": prompt},
+    ])
+
+    await loading_msg.delete()
+
+    try:
+        import json
+        clean = result.replace("```json", "").replace("```", "").strip()
+        data = json.loads(clean)
+        translation = data.get("translation", result)
+        grammar = data.get("grammar_analysis", "")
+        tips = data.get("tips", "")
+        level_hint = data.get("level", "")
+    except Exception:
+        translation = result
+        grammar = ""
+        tips = ""
+        level_hint = ""
+
+    text = f"{flag_from}➡️{flag_to} *Tarjima*\n\n"
+    text += f"📝 *Asl matn:* {esc_md(word)}\n\n"
+    text += f"✅ *Tarjima:* {esc_md(translation)}\n"
+    if level_hint:
+        text += f"📊 *Daraja:* {esc_md(level_hint)}\n"
+    text += "\n"
+    if grammar:
+        text += f"🧠 *Grammatika tahlili:*\n{esc_md(grammar)}\n\n"
+    if tips:
+        text += f"💡 *Maslahat:* {esc_md(tips)}\n\n"
+
+    context.user_data["last_translation"] = translation
+    context.user_data["last_translation_dir"] = direction
+
+    await update.message.reply_text(
+        text,
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 Yana tarjima", callback_data=CB.UZB_DEU if direction == "uzb_deu" else CB.DEU_UZB)],
+            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="tts_translate_last")],
+            [InlineKeyboardButton("🌐 Tarjimon", callback_data=CB.TRANSLATOR)],
+            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+        ])
+    )
+    next_state = UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
+    set_user_state(context, next_state, "TRANSLATOR_INPUT")
+    return next_state
+
+
+async def tts_translate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer("🔊 Ovoz tayyorlanmoqda...")
+    translation = context.user_data.get("last_translation", "Hallo")
+    direction = context.user_data.get("last_translation_dir", "uzb_deu")
+    await speak_text(query, translation, voice="female", speed=0.9)
+    return TRANSLATOR
+
+
+# ==================== YORDAM ====================
+
+async def help_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    await query.edit_message_text(
+        "ℹ️ *Yordam \\- Deutsch Meister Pro*\n\n"
+        "*Buyruqlar:*\n"
+        "/start \\— Botni ishga tushirish\n"
+        "/menu \\— Asosiy menyu\n\n"
+        "*Bo'limlar:*\n"
+        "🤖 *AI Mentor* \\— Daraja, suhbat, xatolar, ovozli lug'at, rolplay\n"
+        "📚 *Lektsiyalar* \\— A1\\-C1 kitoblar va lektsiyalar\n"
+        "🧠 *Flashcard* \\— Vizual yodlash testi\n"
+        "🍅 *Pomodoro* \\— 25 daqiqali fokus taymeri\n"
+        "🌐 *Tarjimon* \\— UZB↔DEU \\+ AI grammatika tahlili\n"
+        "📊 *Progress* \\— XP tizimi, grafiklar, kunlik vazifalar\n"
+        "⚙️ *Sozlamalar* \\— Ovoz, tezlik, daraja\n\n"
+        "*Ovozli funksiyalar:*\n"
+        "🎙️ *TTS* \\— Matnni ovozga aylantirish \\(Edge TTS, German\\)\n"
+        "🎤 *STT* \\— Ovozni matnga o'girish \\(Groq Whisper\\)\n\n"
+        "*XP tizimi:*\n"
+        "• Flashcard: \\+10 XP\n"
+        "• AI suhbat: \\+50 XP\n"
+        "• Xatoni tuzatish: \\+20 XP\n"
+        "• Pomodoro 25 min: \\+30 XP\n"
+        "• Level Up: \\+100 XP",
+        parse_mode="MarkdownV2",
+        reply_markup=back_to_main_keyboard(),
+    )
+    return MAIN_MENU
+
+
+async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user_id = update.effective_user.id
+    db = get_db()
+    user = db.get_or_create_user(user_id)
+    await update.message.reply_text(
+        "🏠 *Asosiy Menu*\n\n"
+        f"📊 Daraja: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}\n"
+        f"⭐ XP: {esc_md(str(user.get('total_xp', 0)))}\n\n"
+        "Bo'limni tanlang:",
+        parse_mode="MarkdownV2",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "ℹ️ *Yordam*\n\n"
+        "/start \\— Boshlash\n"
+        "/menu \\— Menyu\n"
+        "/help \\— Yordam\n\n"
+        "🤖 AI Mentor \\- Shaxsiy AI yordamchi\n"
+        "📚 Lektsiyalar \\- Daraja bo'yicha\n"
+        "🌐 Tarjimon \\- UZB↔DEU\n"
+        "📊 Progress \\- XP va grafiklar",
+        parse_mode="MarkdownV2",
+        reply_markup=back_to_main_keyboard(),
+    )
+
+
+async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Pastki menyu tugmalari — ConversationHandler ichida ishlashi uchun state qaytaradi"""
+    await clear_last_keyboard(context, update.message.chat_id if update.message else None)
+    await update.message.reply_text(
+        "📋 *Tez buyruqlar:*\n\n"
+        "/start \\— Botni qayta boshlash\n"
+        "/menu \\— Asosiy menyu\n"
+        "/help \\— Yordam\n\n"
+        "*Bo'limlar:*\n"
+        "🤖 AI Mentor \\- Daraja aniqlash, suhbat\n"
+        "📚 Lektsiyalar \\- A1\\-C1 kitoblar\n"
+        "🧠 Flashcard \\- Yodlash testlari\n"
+        "🍅 Pomodoro \\- Fokus taymeri\n"
+        "🌐 Tarjimon \\- UZB↔DEU\n"
+        "📊 Progress \\- XP va grafiklar",
+        parse_mode="MarkdownV2",
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+# ==================== OVOZLI XABAR — UNIVERSAL HANDLER ====================
+
+async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+    text = await listen_to_voice(update)
+    await loading.delete()
+
+    if text.startswith("❌"):
+        await update.message.reply_text(
+            f"❌ Ovozni tanishda xato:\n{text}\n\nQayta urinib ko'ring.",
+            reply_markup=back_to_main_keyboard(),
+        )
+        return
+
     db = get_db()
     user = db.get_or_create_user(user_id)
     level = user.get("current_level", "a1")
 
-    if level in ["a1", "a2", "b1"]:
-        await query.edit_message_text(
-            f"💬 *Erfahrungen* faqat *B2 va C1* darajalarida mavjud\\!\n\n"
-            f"Sizning darajangiz: {esc_md(LEVEL_LABELS.get(level, level))}\n\n"
-            f"Avval darajangizni oshiring\\! 📚",
-            parse_mode="MarkdownV2",
-            reply_markup=ai_mentor_menu_keyboard(),
-        )
-        return AI_MENTOR_MENU
-
-    rows = []
-    for key, topic in ERFAHRUNGEN_TOPICS.items():
-        rows.append([InlineKeyboardButton(topic["name"], callback_data=f"erf_topic_{key}")])
-    rows.append([InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")])
-
-    await query.edit_message_text(
-        "💬 *Erfahrungen \\- Mavzu Laboratoriyasi*\n\n"
-        "*10 ta mavzu, 3 ta qiyinlik darajasi*\n\n"
-        "🟢 Oddiy | 🟡 O'rta | 🔴 Qiyin\n\n"
-        "Mavzu tanlang:",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup(rows),
-    )
-    return ERFAHRUNGEN_MENU
-
-
-async def erfahrungen_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    topic_key = query.data.replace("erf_topic_", "")
-    context.user_data["erfahrungen_topic"] = topic_key
-    topic = ERFAHRUNGEN_TOPICS.get(topic_key)
-    if not topic:
-        return ERFAHRUNGEN_MENU
-
-    await query.edit_message_text(
-        f"{topic['name']}\n\n*Qiyinlik darajasini tanlang:*\n\n"
-        f"🟢 *Oddiy:* {esc_md(topic.get('easy', ''))}\n\n"
-        f"🟡 *O'rta:* {esc_md(topic.get('medium', ''))}\n\n"
-        f"🔴 *Qiyin:* {esc_md(topic.get('hard', ''))}",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton("🟢 Oddiy", callback_data=f"erf_diff_{topic_key}_easy"),
-                InlineKeyboardButton("🟡 O'rta", callback_data=f"erf_diff_{topic_key}_medium"),
-                InlineKeyboardButton("🔴 Qiyin", callback_data=f"erf_diff_{topic_key}_hard"),
-            ],
-            [InlineKeyboardButton("↩️ Mavzularga qaytish", callback_data="ai_erfahrungen")],
-        ]),
-    )
-    return ERFAHRUNGEN_DIFFICULTY
-
-
-async def erfahrungen_start_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    parts = query.data.split("_")
-    topic_key = parts[2]
-    difficulty = parts[3]
-
-    topic = ERFAHRUNGEN_TOPICS.get(topic_key)
-    question = topic.get(difficulty, topic.get("easy", "Erzählen Sie von sich.")) if topic else "Erzählen Sie von sich."
-
-    context.user_data["erfahrungen"] = {
-        "topic": topic_key, "difficulty": difficulty,
-        "messages": [], "turns": 0,
-    }
-
-    system_prompt = (
-        f"Sie sind ein deutscher Sprachlehrer für B2/C1 Niveau. "
-        f"Das Thema ist: {topic['name'] if topic else 'Allgemein'}. "
-        f"Sprechen Sie Deutsch, erklären Sie komplexe Punkte auf Uzbekisch."
-    )
-
     ai_response = await groq_chat([
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Mavzu: {topic_key}, Qiyinlik: {difficulty}\nSavol: {question}"},
-    ], max_tokens=512)
+        {"role": "system", "content": (
+            f"Siz nemis tili o'qituvchisisiz. Foydalanuvchi darajasi: {level.upper()}. "
+            f"Qisqa, qulay javob bering. Xatolar bo'lsa muloyim tuzating."
+        )},
+        {"role": "user", "content": f"[Ovozli xabar] {text}"},
+    ])
 
-    context.user_data["erfahrungen"]["messages"] = [
-        {"role": "system", "content": system_prompt},
-        {"role": "assistant", "content": ai_response},
+    db.add_xp(user_id, XP_REWARDS.get("voice_practice", 15), "voice_message", text[:50])
+
+    await update.message.reply_text(
+        f"🎤 *Siz:* _{esc_md(text)}_\n\n"
+        f"🤖 *AI Mentor:*\n{esc_md(ai_response)}\n\n"
+        f"🎁 *\\+{XP_REWARDS.get('voice_practice', 15)} XP*",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🤖 AI Mentor", callback_data=CB.AI_MENTOR_MENU)],
+            [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
+        ])
+    )
+
+    await speak_text(update, ai_response, voice="female", speed=0.95)
+
+
+# ==================== MAIN ====================
+
+def main() -> None:
+    if not TOKEN or TOKEN == "SIZNING_BOT_TOKENINGIZ":
+        logger.error("❌ BOT_TOKEN topilmadi!")
+        return
+
+    db = get_db()
+    logger.info("✅ Ma'lumotlar bazasi tayyor!")
+    load_lessons()
+
+    application = Application.builder().token(TOKEN).build()
+
+        # Reply keyboard tugmalari (har bir state'da birinchi tekshiriladi)
+    reply_keyboard_handlers = [
+        MessageHandler(filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^📖 Kunlik so\'z$"), daily_word_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^🤖 AI Mentor$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^📊 Progressim$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^🌐 Tarjimon$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^ℹ️ Yordam$"), reply_menu_handler),
     ]
 
-    await query.edit_message_text(
-        f"💬 *Erfahrungen: {esc_md(topic['name'] if topic else 'Mavzu')}*\n"
-        f"Qiyinlik: {difficulty.upper()}\n\n"
-        f"📝 *Savol:*\n{esc_md(question)}\n\n"
-        f"{esc_md(ai_response)}\n\n"
-        f"*Javobingizni yozing yoki ovoz yuboring\\!*",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
-        ])
-    )
-    return ERFAHRUNGEN_CHAT
-
-
-async def erfahrungen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    erf_data = context.user_data.get("erfahrungen", {})
-    turns = erf_data.get("turns", 0)
-
-    if update.callback_query and update.callback_query.data == "erf_finish":
-        return await erfahrungen_result(update, context)
-
-    # Ovozli yoki matnli
-    if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-        user_message = await listen_to_voice(update)
-        await loading.delete()
-    elif update.message and update.message.text:
-        user_message = update.message.text.strip()
-    else:
-        return ERFAHRUNGEN_CHAT
-
-    erf_data["messages"].append({"role": "user", "content": user_message})
-    turns += 1
-    erf_data["turns"] = turns
-
-    if turns >= 5:
-        return await erfahrungen_result(update, context)
-
-    messages = erf_data["messages"][:] + [{
-        "role": "user",
-        "content": f"Foydalanuvchi javobi ({turns}/5):\n{user_message}\nKeyingi savol bering!"
-    }]
-
-    ai_response = await groq_chat(messages, max_tokens=512)
-    erf_data["messages"].append({"role": "assistant", "content": ai_response})
-
-    await update.message.reply_text(
-        f"{esc_md(ai_response)}\n\n*\\({turns}/5\\)* \\-\\> Javobingizni yozing:",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
-        ])
-    )
-    return ERFAHRUNGEN_CHAT
-
-
-async def erfahrungen_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    erf_data = context.user_data.get("erfahrungen", {})
-    messages = erf_data.get("messages", [])
-    turns = erf_data.get("turns", 0)
-
-    await (update.callback_query.edit_message_text if update.callback_query
-           else update.message.reply_text)(
-        "🧠 *AI yakuniy tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2"
-    )
-
-    result = await groq_json(messages + [{
-        "role": "user",
-        "content": (
-            "Suhbat tugadi. JSON tahlil bering: {"
-            '"score": 0-10, "grammar_score": 0-10, "vocabulary_score": 0-10, '
-            '"fluency_score": 0-10, "feedback": "tahlil o\'zbek tilida", '
-            '"good_points": ["..."], "improvements": ["..."]}'
-        )
-    }], max_tokens=1024)
-
-    user_id = (update.callback_query.from_user.id if update.callback_query else update.effective_user.id)
-    db = get_db()
-    score = result.get("score", 5)
-    db.add_xp(user_id, XP_REWARDS.get("ai_conversation", 50), "erfahrungen", f"Ball: {score}/10")
-
-    good_points = "\n".join([f"✅ {p}" for p in result.get("good_points", [])])
-    improvements = "\n".join([f"💡 {i}" for i in result.get("improvements", [])])
-
-    text = (
-        f"🏁 *Erfahrungen natijasi*\n\n"
-        f"⭐ *Umumiy ball: {score}/10*\n"
-        f"📚 *Grammatika: {result.get('grammar_score', 5)}/10*\n"
-        f"🗣️ *So'z boyligi: {result.get('vocabulary_score', 5)}/10*\n"
-        f"💬 *Suvliklik: {result.get('fluency_score', 5)}/10*\n\n"
-        f"*Tahlil:*\n{esc_md(result.get('feedback', 'Yaxshi urinish!'))}\n\n"
-        f"*Yaxshi jihatlar:*\n{esc_md(good_points)}\n\n"
-        f"*Yaxshilash uchun:*\n{esc_md(improvements)}\n\n"
-        f"🎁 *+{XP_REWARDS.get('ai_conversation', 50)} XP*"
-    )
-
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
-    else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
-    return AI_MENTOR_MENU
-
-
-# ==================== 4. MISTAKE BANK ====================
-
-async def mistake_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    db = get_db()
-    stats = db.get_mistake_stats(user_id)
-
-    text = (
-        f"🔧 *Mening xato bankim*\n\n"
-        f"❌ *Faol xatolar: {stats['active']}*\n"
-        f"✅ *O'zlashtirilgan: {stats['mastered']}*\n"
-        f"📊 *Jami: {stats['total']}*\n\n"
-    )
-
-    if stats["active"] > 0:
-        text += "Xatolaringizni ko'rib chiqing va mini\\-darslarni o'ting\\! 📚"
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📋 Xatolar ro'yxati", callback_data="mistake_list")],
-            [InlineKeyboardButton("🎲 Tasodifiy mini-dars", callback_data="mistake_random")],
-            [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-        ])
-    else:
-        text += "Ajoyib\\! Sizda faol xatolar yo'q\\! 🎉"
-        keyboard = ai_mentor_menu_keyboard()
-
-    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-    return MISTAKE_BANK_MENU
-
-
-async def mistake_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    db = get_db()
-    mistakes = db.get_mistakes(user_id, mastered=False, limit=10)
-
-    if not mistakes:
-        await query.edit_message_text(
-            "✅ *Barcha xatolar o'zlashtirilgan\\!*\n\nAjoyib ish\\! 🎉",
-            parse_mode="MarkdownV2",
-            reply_markup=ai_mentor_menu_keyboard(),
-        )
-        return AI_MENTOR_MENU
-
-    text = "🔧 *Sizning xatolaringiz:*\n\n"
-    keyboard_rows = []
-    for i, m in enumerate(mistakes[:5], 1):
-        text += f"{i}\\. *{esc_md(m['user_input'])}* → {esc_md(m['correct_form'])}\n"
-        text += f"   _{esc_md(m['mistake_type'])}_\n\n"
-        keyboard_rows.append([InlineKeyboardButton(
-            f"{i}. {m['user_input'][:20]} → Mini-dars",
-            callback_data=f"mistake_lesson_{m['id']}"
-        )])
-
-    keyboard_rows.append([InlineKeyboardButton("↩️ Xato bankiga qaytish", callback_data="ai_mistake_bank")])
-    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard_rows))
-    return MISTAKE_BANK_MENU
-
-
-async def mistake_mini_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    mistake_id = int(query.data.replace("mistake_lesson_", ""))
-    db = get_db()
-    mistake = db.get_mistake_by_id(mistake_id)
-
-    if not mistake:
-        await query.edit_message_text("❌ Xato topilmadi.", reply_markup=ai_mentor_menu_keyboard())
-        return AI_MENTOR_MENU
-
-    context.user_data["current_mistake_id"] = mistake_id
-    context.user_data["mistake_speak_text"] = mistake.get("correct_form", "")
-
-    lesson_text = mistake.get("mini_lesson", "")
-    if not lesson_text:
-        result = await groq_json([
-            {"role": "system", "content": "Siz nemis tili grammatika o'qituvchisisiz."},
-            {"role": "user", "content": (
-                f'Xato: "{mistake["user_input"]}" To\'g\'ri: "{mistake["correct_form"]}" '
-                f'Turi: {mistake["mistake_type"]}\n'
-                'JSON: {"rule": "grammatik qoida", "explanation": "tushuntirish o\'zbek tilida", '
-                '"example_correct": "3 ta to\'g\'ri misol", "example_wrong": "3 ta noto\'g\'ri misol", '
-                '"tip": "xotirada saqlash maslahat"}'
-            )},
-        ], max_tokens=1024)
-
-        lesson_text = (
-            f"📚 *Grammatik qoida:*\n{esc_md(result.get('rule', 'N/A'))}\n\n"
-            f"📝 *Tushuntirish:*\n{esc_md(result.get('explanation', 'N/A'))}\n\n"
-            f"✅ *To'g'ri misollar:*\n{esc_md(result.get('example_correct', 'N/A'))}\n\n"
-            f"❌ *Noto'g'ri misollar:*\n{esc_md(result.get('example_wrong', 'N/A'))}\n\n"
-            f"💡 *Maslahat:*\n{esc_md(result.get('tip', 'N/A'))}"
-        )
-
-    await query.edit_message_text(
-        f"🔧 *Mini-dars*\n\n"
-        f"❌ *Sizning xato: {esc_md(mistake['user_input'])}*\n"
-        f"✅ *To'g'ri: {esc_md(mistake['correct_form'])}*\n"
-        f"📌 *Turi: {esc_md(mistake['mistake_type'])}*\n\n"
-        f"{lesson_text}",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake_id}")],
-            [InlineKeyboardButton("✏️ Mashqlarni bajarish", callback_data=f"mistake_practice_{mistake_id}")],
-            [InlineKeyboardButton("✨ Yaxshilash", callback_data=f"mistake_improve_{mistake_id}")],
-            [InlineKeyboardButton("✅ O'zlashtirdim", callback_data=f"mistake_master_{mistake_id}")],
-            [InlineKeyboardButton("↩️ Xatolar ro'yxati", callback_data="mistake_list")],
-        ])
-    )
-    return MISTAKE_MINILESSON
-
-
-async def mistake_speak_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Xatoning to'g'ri versiyasini ovozda o'qish"""
-    query = update.callback_query
-    await query.answer("🔊 Ovoz tayyorlanmoqda...")
-
-    mistake_id = int(query.data.replace("mistake_speak_", ""))
-    db = get_db()
-    mistake = db.get_mistake_by_id(mistake_id)
-
-    if mistake and mistake.get("correct_form"):
-        await speak_text(query, mistake["correct_form"], voice="female", speed=0.85)
-
-    return MISTAKE_MINILESSON
-
-
-async def mistake_improve_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Xato bo'yicha AI dan to'liq tushuntirish"""
-    query = update.callback_query
-    await query.answer()
-
-    mistake_id = int(query.data.replace("mistake_improve_", ""))
-    db = get_db()
-    mistake = db.get_mistake_by_id(mistake_id)
-
-    if not mistake:
-        return MISTAKE_BANK_MENU
-
-    result = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi."},
-        {"role": "user", "content": (
-            f'Xato: "{mistake["user_input"]}" To\'g\'ri: "{mistake["correct_form"]}"\n'
-            'JSON: {"tafsilot": "batafsil tushuntirish o\'zbek tilida (5-7 gap)", '
-            '"sinonimlar": ["sinon1", "sinon2"], '
-            '"misollar": ["misol 1", "misol 2", "misol 3"]}'
-        )},
-    ])
-
-    sinonimlar = ", ".join(result.get("sinonimlar", []))
-    misollar = "\n".join([f"• {esc_md(m)}" for m in result.get("misollar", [])])
-
-    await query.edit_message_text(
-        f"✨ *To'liq tushuntirish*\n\n"
-        f"❌ *Xato:* {esc_md(mistake['user_input'])}\n"
-        f"✅ *To'g'ri:* {esc_md(mistake['correct_form'])}\n\n"
-        f"📝 *Tafsilot:*\n{esc_md(result.get('tafsilot', ''))}\n\n"
-        f"🔁 *Sinonimlar:* {esc_md(sinonimlar)}\n\n"
-        f"📌 *Misollar:*\n{misollar}",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake_id}")],
-            [InlineKeyboardButton("✅ O'zlashtirdim", callback_data=f"mistake_master_{mistake_id}")],
-            [InlineKeyboardButton("↩️ Xatolar ro'yxati", callback_data="mistake_list")],
-        ])
-    )
-    return MISTAKE_MINILESSON
-
-
-async def mistake_practice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    mistake_id = int(query.data.replace("mistake_practice_", ""))
-    db = get_db()
-    mistake = db.get_mistake_by_id(mistake_id)
-
-    if not mistake:
-        return MISTAKE_BANK_MENU
-
-    result = await groq_json([
-        {"role": "system", "content": "Nemis tili mashq yaratuvchisi."},
-        {"role": "user", "content": (
-            f'Xato: "{mistake["user_input"]}" To\'g\'ri: "{mistake["correct_form"]}"\n'
-            'JSON: {"exercises": [{"task": "mashq", "answer": "javob"}, '
-            '{"task": "mashq", "answer": "javob"}, {"task": "mashq", "answer": "javob"}]}'
-        )},
-    ])
-
-    exercises = result.get("exercises", [
-        {"task": "To'g'ri variantni yozing:", "answer": mistake["correct_form"]},
-    ])
-
-    context.user_data["mistake_exercises"] = {
-        "exercises": exercises, "current": 0,
-        "correct": 0, "mistake_id": mistake_id,
-    }
-
-    ex = exercises[0]
-    await query.edit_message_text(
-        f"✏️ *Mashq 1/{len(exercises)}*\n\n{esc_md(ex['task'])}\n\nJavobingizni yozing:",
-        parse_mode="MarkdownV2",
-    )
-    return MISTAKE_PRACTICE
-
-
-async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    ex_data = context.user_data.get("mistake_exercises", {})
-    current = ex_data.get("current", 0)
-    exercises = ex_data.get("exercises", [])
-
-    if not exercises or current >= len(exercises):
-        return MISTAKE_BANK_MENU
-
-    user_answer = update.message.text.strip()
-    correct_answer = exercises[current].get("answer", "")
-    is_correct = user_answer.lower().strip() in correct_answer.lower() or correct_answer.lower() in user_answer.lower()
-
-    if is_correct:
-        ex_data["correct"] += 1
-        await update.message.reply_text(f"✅ *To'g'ri\\!* `{esc_md(correct_answer)}`", parse_mode="MarkdownV2")
-    else:
-        await update.message.reply_text(
-            f"❌ *Noto'g'ri*\nSiz: `{esc_md(user_answer)}`\nTo'g'ri: `{esc_md(correct_answer)}`",
-            parse_mode="MarkdownV2"
-        )
-
-    current += 1
-    ex_data["current"] = current
-
-    if current >= len(exercises):
-        correct_count = ex_data["correct"]
-        total = len(exercises)
-        mistake_id = ex_data["mistake_id"]
-        db = get_db()
-        db.review_mistake(mistake_id)
-        db.add_xp(update.effective_user.id, XP_REWARDS.get("mistake_corrected", 5),
-                  "mistake_practice", f"{correct_count}/{total}")
-
-        if correct_count == total:
-            db.master_mistake(mistake_id)
-            await update.message.reply_text(
-                f"🎉 *Barcha mashqlar bajarildi\\!* {correct_count}/{total}\n\n"
-                f"✅ Bu xato o'zlashtirildi\\!\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*",
-                parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
-            )
-        else:
-            await update.message.reply_text(
-                f"📊 *Natija: {correct_count}/{total}*\n\nYana mashq qilishingiz mumkin\\!",
-                parse_mode="MarkdownV2",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🔁 Qayta mashq", callback_data=f"mistake_practice_{mistake_id}")],
-                    [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-                ])
-            )
-        return AI_MENTOR_MENU
-
-    ex = exercises[current]
-    await update.message.reply_text(
-        f"✏️ *Mashq {current + 1}/{len(exercises)}*\n\n{esc_md(ex['task'])}\n\nJavobingizni yozing:",
-        parse_mode="MarkdownV2",
-    )
-    return MISTAKE_PRACTICE
-
-
-async def mistake_master(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    mistake_id = int(query.data.replace("mistake_master_", ""))
-    db = get_db()
-    db.master_mistake(mistake_id)
-    db.add_xp(query.from_user.id, XP_REWARDS.get("mistake_corrected", 5), "mistake_mastered")
-
-    await query.edit_message_text(
-        f"✅ *Xato o'zlashtirildi\\!* 🎉\n\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*",
-        parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
-    )
-    return AI_MENTOR_MENU
-
-
-async def mistake_random(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    query = update.callback_query
-    await query.answer()
-
-    user_id = query.from_user.id
-    db = get_db()
-    mistakes = db.get_mistakes(user_id, mastered=False, limit=100)
-
-    if not mistakes:
-        await query.edit_message_text(
-            "✅ *Barcha xatolar o'zlashtirilgan\\!*\n\nAjoyib ish\\! 🎉",
-            parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
-        )
-        return AI_MENTOR_MENU
-
-    mistake = random.choice(mistakes)
-    context.user_data["current_mistake_id"] = mistake["id"]
-
-    result = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi."},
-        {"role": "user", "content": (
-            f'Xato: "{mistake["user_input"]}" To\'g\'ri: "{mistake["correct_form"]}"\n'
-            'JSON: {"rule": "grammatik qoida (qisqa)", '
-            '"explanation": "tushuntirish o\'zbek tilida qisqa", "tip": "maslahat"}'
-        )},
-    ])
-
-    await query.edit_message_text(
-        f"🎲 *Tasodifiy mini-dars*\n\n"
-        f"❌ *Xato: {esc_md(mistake['user_input'])}*\n"
-        f"✅ *To'g'ri: {esc_md(mistake['correct_form'])}*\n\n"
-        f"📚 *Qoida:*\n{esc_md(result.get('rule', 'N/A'))}\n\n"
-        f"📝 *Tushuntirish:*\n{esc_md(result.get('explanation', 'N/A'))}\n\n"
-        f"💡 *Maslahat:*\n{esc_md(result.get('tip', 'N/A'))}",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake['id']}")],
-            [InlineKeyboardButton("✏️ Mashq qilish", callback_data=f"mistake_practice_{mistake['id']}")],
-            [InlineKeyboardButton("✅ O'zlashtirdim", callback_data=f"mistake_master_{mistake['id']}")],
-            [InlineKeyboardButton("🎲 Boshqa mini-dars", callback_data="mistake_random")],
-            [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-        ])
-    )
-    return MISTAKE_MINILESSON
-
-
-# ==================== 5. OVOZLI LUG'AT (TO'LIQ QAYTA YOZILGAN) ====================
-
-async def voice_vocab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Ovozli lug'at — daraja tanlash"""
-    query = update.callback_query
-    await query.answer()
-
-    await query.edit_message_text(
-        "📚 *Ovozli Lug'at*\n\n"
-        "AI 25 ta so'z generatsiya qiladi\\.\n"
-        "Test, Sprechen va Rolli o'yin imkoniyatlari\\!\n\n"
-        "*Darajangizni tanlang:*",
-        parse_mode="MarkdownV2",
-        reply_markup=level_select_keyboard("vocab_level"),
-    )
-    return VOICE_VOCAB_LEVEL
-
-
-async def voice_vocab_level_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Daraja tanlandi — mavzu tanlash"""
-    query = update.callback_query
-    await query.answer()
-
-    level = query.data.replace("vocab_level_", "")
-    context.user_data["vocab_level"] = level
-    topics = VOCAB_TOPICS.get(level, [])
-
-    await query.edit_message_text(
-        f"📚 *Ovozli Lug'at — {level.upper()}*\n\n"
-        f"*Mavzu tanlang \\({len(topics)} ta mavzu\\):*",
-        parse_mode="MarkdownV2",
-        reply_markup=topics_keyboard(topics, f"vocab_topic_{level}"),
-    )
-    return VOICE_VOCAB_TOPIC
-
-
-async def voice_vocab_topic_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Mavzu tanlandi — 25 ta so'z generatsiya"""
-    query = update.callback_query
-    await query.answer()
-
-    # callback: vocab_topic_{level}_{idx}
-    parts = query.data.split("_")
-    level = parts[2]
-    topic_idx = int(parts[3])
-    topics = VOCAB_TOPICS.get(level, [])
-
-    if topic_idx >= len(topics):
-        return VOICE_VOCAB_TOPIC
-
-    topic = topics[topic_idx]
-    context.user_data["vocab_topic"] = topic
-    context.user_data["vocab_level"] = level
-
-    await query.edit_message_text(
-        f"📚 *{esc_md(topic)}*\n\n⏳ *AI 25 ta so'z tayyorlamoqda\\.\\.\\.*",
-        parse_mode="MarkdownV2",
-    )
-
-    # AI dan 25 so'z
-    words_data = await _vocab_generate_words(level, topic)
-    context.user_data["vocab_words"] = words_data
-
-    if not words_data:
-        await query.message.reply_text(
-            "❌ So'zlar yuklanmadi. Qayta urinib ko'ring.",
-            reply_markup=ai_mentor_menu_keyboard()
-        )
-        return AI_MENTOR_MENU
-
-    # Ko'rsatish
-    text = f"📚 *{esc_md(level.upper())} — {esc_md(topic)}* \\(25 ta so'z\\)\n\n"
-    for i, w in enumerate(words_data[:25], 1):
-        german = w.get("german", "")
-        uzbek = w.get("uzbek", "")
-        izoh = w.get("izoh", "")
-        sinonimlar = ", ".join(w.get("sinonimlar", []))
-
-        text += f"*{i}\\.* {esc_md(german)} — {esc_md(uzbek)}\n"
-        if izoh:
-            text += f"   📝 _{esc_md(izoh)}_\n"
-        if sinonimlar:
-            text += f"   🔁 _{esc_md(sinonimlar)}_\n"
-        text += "\n"
-
-        # Telegram 4096 belgi chegarasi — bo'laklash
-        if len(text) > 3500 and i < 25:
-            await query.message.reply_text(text, parse_mode="MarkdownV2")
-            text = ""
-
-    if text:
-        await query.message.reply_text(
-            text if text else f"📚 *{esc_md(topic)}*",
-            parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("✏️ Test qilish", callback_data="vocab_test_start"),
-                    InlineKeyboardButton("🎤 Sprechen", callback_data="vocab_sprechen"),
-                    InlineKeyboardButton("🎭 Rolli o'yin", callback_data="vocab_roleplay"),
-                ],
-                [InlineKeyboardButton("🔁 Boshqa mavzu", callback_data=f"vocab_level_{level}")],
-                [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-            ])
-        )
-
-    return VOICE_VOCAB_WORDS
-
-
-async def _vocab_generate_words(level: str, topic: str) -> list:
-    """AI dan 25 so'z generatsiya qilish"""
-    result = await groq_json([
-        {"role": "system", "content": (
-            f"Sen nemis tili lug'at mutaxassisisiz. {level.upper()} darajasi uchun "
-            f"'{topic}' mavzusida 25 ta so'z ber. "
-            "Faqat JSON: {\"words\": [{\"german\": \"das Wort\", \"uzbek\": \"tarjima\", "
-            "\"izoh\": \"qisqacha izoh o'zbek tilida (1 gap)\", \"sinonimlar\": []}]}"
-        )},
-        {"role": "user", "content": f"Level: {level}, Mavzu: {topic}, 25 ta so'z ber."}
-    ], max_tokens=2048)
-    return result.get("words", [])
-
-
-async def vocab_test_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Lug'at testi boshlash"""
-    query = update.callback_query
-    await query.answer()
-
-    words = context.user_data.get("vocab_words", [])
-    if not words:
-        return VOICE_VOCAB_WORDS
-
-    context.user_data["vocab_test"] = {
-        "words": words, "current": 0,
-        "correct": 0, "direction": "uzb_to_de",
-    }
-
-    w = words[0]
-    await query.edit_message_text(
-        f"🧠 *Test 1/{len(words)}*\n\n"
-        f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
-        f"_\\(Yozma yoki 🎙️ ovozli javob bering\\)_",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
-        ])
-    )
-    return VOICE_VOCAB_TEST
-
-
-async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Test javobini qayta ishlash"""
-    test_data = context.user_data.get("vocab_test", {})
-    words = test_data.get("words", [])
-    current = test_data.get("current", 0)
-
-    if update.callback_query:
-        cb = update.callback_query
-        await cb.answer()
-        if cb.data == "vocab_test_finish":
-            return await _vocab_test_result(cb, context)
-        if cb.data == "vocab_skip":
-            current += 1
-            test_data["current"] = current
-            if current >= len(words):
-                return await _vocab_test_result(cb, context)
-            w = words[current]
-            await cb.edit_message_text(
-                f"🧠 *Test {current + 1}/{len(words)}*\n\n"
-                f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
-                f"_\\(Yozma yoki 🎙️ ovozli\\)_",
-                parse_mode="MarkdownV2",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
-                    [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
-                ])
-            )
-            return VOICE_VOCAB_TEST
-
-    # Matn yoki ovoz
-    if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-        user_answer = await listen_to_voice(update)
-        await loading.delete()
-    elif update.message and update.message.text:
-        user_answer = update.message.text.strip()
-    else:
-        return VOICE_VOCAB_TEST
-
-    if current >= len(words):
-        return AI_MENTOR_MENU
-
-    correct_word = words[current].get("german", "").lower()
-    is_correct = (
-        user_answer.lower().replace("der ", "").replace("die ", "").replace("das ", "") in
-        correct_word.replace("der ", "").replace("die ", "").replace("das ", "")
-        or correct_word.replace("der ", "").replace("die ", "").replace("das ", "") in
-        user_answer.lower().replace("der ", "").replace("die ", "").replace("das ", "")
-    )
-
-    if is_correct:
-        test_data["correct"] += 1
-        db = get_db()
-        db.add_xp(update.effective_user.id, XP_REWARDS.get("vocab_test_correct", 5),
-                  "vocab_test", words[current].get("german", ""))
-        await update.message.reply_text(
-            f"✅ *To'g'ri\\!* `{esc_md(words[current].get('german', ''))}` \\+5 XP",
-            parse_mode="MarkdownV2"
-        )
-    else:
-        await update.message.reply_text(
-            f"❌ *Noto'g'ri*\n"
-            f"Siz: `{esc_md(user_answer)}`\n"
-            f"To'g'ri: `{esc_md(words[current].get('german', ''))}`",
-            parse_mode="MarkdownV2"
-        )
-
-    current += 1
-    test_data["current"] = current
-
-    if current >= len(words):
-        correct_count = test_data["correct"]
-        total = len(words)
-        await update.message.reply_text(
-            f"🏁 *Test tugadi\\!*\n\n"
-            f"✅ *To'g'ri: {correct_count}/{total}*\n"
-            f"⭐ *Ball: {int(correct_count/total*10)}/10*\n\n"
-            f"🎁 *+{correct_count * XP_REWARDS.get('vocab_test_correct', 5)} XP*",
-            parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔁 Qayta test", callback_data="vocab_test_start")],
-                [InlineKeyboardButton("🎤 Sprechen", callback_data="vocab_sprechen")],
-                [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-            ])
-        )
-        return VOICE_VOCAB_WORDS
-
-    w = words[current]
-    await update.message.reply_text(
-        f"🧠 *Test {current + 1}/{len(words)}*\n\n"
-        f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
-        f"_\\(Yozma yoki 🎙️ ovozli\\)_",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
-        ])
-    )
-    return VOICE_VOCAB_TEST
-
-
-async def _vocab_test_result(query, context) -> int:
-    test_data = context.user_data.get("vocab_test", {})
-    correct = test_data.get("correct", 0)
-    total = len(test_data.get("words", [1]))
-    await query.edit_message_text(
-        f"🏁 *Test tugadi\\!*\n\n✅ *To'g'ri: {correct}/{total}*",
-        parse_mode="MarkdownV2",
-        reply_markup=ai_mentor_menu_keyboard(),
-    )
-    return VOICE_VOCAB_WORDS
-
-
-async def vocab_sprechen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Sprechen — 1 daqiqalik hikoya"""
-    query = update.callback_query
-    await query.answer()
-
-    words = context.user_data.get("vocab_words", [])
-    topic = context.user_data.get("vocab_topic", "Allgemein")
-    level = context.user_data.get("vocab_level", "a1")
-
-    if not words:
-        return VOICE_VOCAB_WORDS
-
-    await query.edit_message_text(
-        f"🎤 *Sprechen — {esc_md(topic)}*\n\n⏳ *Hikoya tayyorlanmoqda\\.\\.\\.*",
-        parse_mode="MarkdownV2",
-    )
-
-    word_list = ", ".join([w.get("german", "") for w in words[:25]])
-    story = await groq_chat([
-        {"role": "system", "content": (
-            f"Siz nemis tili o'qituvchisisiz. {level.upper()} darajasi uchun "
-            f"'{topic}' mavzusida 1 daqiqalik hikoya yaz. "
-            f"Barcha quyidagi so'zlar ishtirok etsin: {word_list}. "
-            "Hikoya natural, chiroyli va o'qish uchun qulay bo'lsin. "
-            "Taxminan 120-150 so'z. Faqat nemischa yaz."
-        )},
-        {"role": "user", "content": "Hikoya yaz"}
-    ], max_tokens=512)
-
-    context.user_data["vocab_sprechen_story"] = story
-    context.user_data["vocab_sprechen_started"] = False
-
-    await query.message.reply_text(
-        f"🎤 *Sprechen — {esc_md(topic)}*\n\n"
-        f"*Hikoya \\(1 daqiqa\\):*\n\n{esc_md(story)}\n\n"
-        f"_O'qib yodlang, keyin ovozda aytib bering\\!_",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vocab_speak_story")],
-            [InlineKeyboardButton("🎙️ O'zim aytib beraman", callback_data="vocab_sprechen_ready")],
-            [InlineKeyboardButton("↩️ Orqaga", callback_data="ai_voice_vocab")],
-        ])
-    )
-    return VOICE_VOCAB_SPRECHEN
-
-
-async def vocab_speak_story(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Hikoyani TTS bilan o'qish"""
-    query = update.callback_query
-    await query.answer("🔊 Hikoya o'qilmoqda...")
-
-    story = context.user_data.get("vocab_sprechen_story", "")
-    if story:
-        await speak_text(query, story, voice="female", speed=0.9)
-
-    return VOICE_VOCAB_SPRECHEN
-
-
-async def vocab_sprechen_ready(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Foydalanuvchi hikoyani aytishga tayyor"""
-    query = update.callback_query
-    await query.answer()
-
-    context.user_data["vocab_sprechen_started"] = True
-    await query.edit_message_text(
-        "🎙️ *Endi siz aytib bering\\!*\n\n"
-        "Hikoyani ovozli xabar sifatida yuboring\\.\n"
-        "_Kamera o'chirilmaydi, faqat ovoz yuboring\\._",
-        parse_mode="MarkdownV2",
-    )
-    return VOICE_VOCAB_SPRECHEN
-
-
-async def vocab_sprechen_process(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Foydalanuvchi ovozini tahlil qilish"""
-    if not context.user_data.get("vocab_sprechen_started"):
-        return VOICE_VOCAB_SPRECHEN
-
-    if not update.message or not (update.message.voice or update.message.audio):
-        await update.message.reply_text("🎙️ Iltimos, ovozli xabar yuboring!")
-        return VOICE_VOCAB_SPRECHEN
-
-    loading = await update.message.reply_text("🧠 *Tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-    user_text = await listen_to_voice(update)
-    await loading.delete()
-
-    story = context.user_data.get("vocab_sprechen_story", "")
-    topic = context.user_data.get("vocab_topic", "Allgemein")
-
-    result = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi. Nutqni baholash."},
-        {"role": "user", "content": (
-            f"Asl hikoya: {story}\n"
-            f"Foydalanuvchi dedi: {user_text}\n"
-            'JSON: {"score": 0-10, "feedback": "tahlil o\'zbek tilida", '
-            '"good": "yaxshi jihatlar", "improve": "yaxshilash kerak"}'
-        )},
-    ])
-
-    user_id = update.effective_user.id
-    db = get_db()
-    db.add_xp(user_id, XP_REWARDS.get("vocab_sprechen", 30), "vocab_sprechen", topic)
-
-    await update.message.reply_text(
-        f"🎤 *Sprechen natijasi*\n\n"
-        f"⭐ *Ball: {result.get('score', 5)}/10*\n\n"
-        f"✅ *Yaxshi:* {esc_md(result.get('good', ''))}\n\n"
-        f"💡 *Yaxshilash:* {esc_md(result.get('improve', ''))}\n\n"
-        f"📝 *Tahlil:* {esc_md(result.get('feedback', ''))}\n\n"
-        f"🎁 *+{XP_REWARDS.get('vocab_sprechen', 30)} XP*",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔁 Qayta urinish", callback_data="vocab_sprechen")],
-            [InlineKeyboardButton("🎭 Rolli o'yin", callback_data="vocab_roleplay")],
-            [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-        ])
-    )
-    return VOICE_VOCAB_WORDS
-
-
-async def vocab_roleplay_from_vocab(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Lug'at bo'limidan rolli o'yinga o'tish"""
-    query = update.callback_query
-    await query.answer()
-
-    topic = context.user_data.get("vocab_topic", "")
-    level = context.user_data.get("vocab_level", "a1")
-
-    # O'sha mavzuda rolli o'yin boshlash
-    if topic:
-        context.user_data["rp_level"] = level
-        context.user_data["rp_topic"] = topic
-        return await _roleplay_start_with_topic(query, context, level, topic)
-
-    return await roleplay_menu(update, context)
-
-
-# ==================== 6. ROLLI O'YIN (TO'LIQ QAYTA YOZILGAN - TELC/GOETHE USLUBI) ====================
-
-async def roleplay_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Rolli o'yin — daraja tanlash"""
-    query = update.callback_query
-    await query.answer()
-
-    await query.edit_message_text(
-        "🎭 *Rolli O'yin*\n\n"
-        "TELC / Goethe / ÖSD imtihoniga tayyorgarlik\\!\n\n"
-        "Biz ikkovimiz birgalikda bir narsani rejalashtiramiz \\(gemeinsam etwas planen\\)\\.\n\n"
-        "*Darajangizni tanlang:*",
-        parse_mode="MarkdownV2",
-        reply_markup=level_select_keyboard("rp_level"),
-    )
-    return ROLEPLAY_LEVEL
-
-
-async def roleplay_level_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Daraja tanlandi — mavzu tanlash"""
-    query = update.callback_query
-    await query.answer()
-
-    level = query.data.replace("rp_level_", "")
-    context.user_data["rp_level"] = level
-    topics = ROLEPLAY_TOPICS.get(level, [])
-
-    await query.edit_message_text(
-        f"🎭 *Rolli O'yin — {level.upper()}*\n\n"
-        f"*Mavzu tanlang \\({len(topics)} ta mavzu\\):*",
-        parse_mode="MarkdownV2",
-        reply_markup=topics_keyboard(topics, f"rp_topic_{level}"),
-    )
-    return ROLEPLAY_TOPIC
-
-
-async def roleplay_topic_select(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Mavzu tanlandi — qoidalar ko'rsatish"""
-    query = update.callback_query
-    await query.answer()
-
-    parts = query.data.split("_")
-    level = parts[2]
-    topic_idx = int(parts[3])
-    topics = ROLEPLAY_TOPICS.get(level, [])
-
-    if topic_idx >= len(topics):
-        return ROLEPLAY_TOPIC
-
-    topic = topics[topic_idx]
-    context.user_data["rp_topic"] = topic
-    context.user_data["rp_level"] = level
-
-    return await _roleplay_show_rules(query, context, level, topic)
-
-
-async def _roleplay_show_rules(query, context, level: str, topic: str) -> int:
-    """Rolli o'yin qoidalarini ko'rsatish"""
-    # Mavzuga mos punktlar generatsiya
-    punkte = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi. TELC Sprechen uslubi."},
-        {"role": "user", "content": (
-            f"'{topic}' mavzusida birgalikda rejalashtirish uchun 5 ta punkt ber. "
-            f"Daraja: {level.upper()}. "
-            'JSON: {"punkte": ["1. Wo? - ...", "2. Wann? - ...", "3. ...", "4. ...", "5. ..."]}'
-        )},
-    ])
-
-    punkt_list = punkte.get("punkte", ROLEPLAY_PUNKTE["default"])
-    context.user_data["rp_punkte"] = punkt_list
-
-    punkt_text = "\n".join([f"{esc_md(p)}" for p in punkt_list])
-
-    await query.edit_message_text(
-        f"🎭 *Rolli O'yin — {esc_md(topic)}*\n\n"
-        f"📋 *QOIDALAR:*\n"
-        f"Bu o'yin TELC/Goethe imtihonidagi Sprechen qismi uslubida\\.\n"
-        f"Biz ikkovimiz birgalikda *{esc_md(topic)}* ni rejalashtiramiz\\.\n\n"
-        f"✅ *Vazifangiz:*\n"
-        f"• Taklif kiriting\n"
-        f"• Savol bering\n"
-        f"• Kelishuvga erishing\n\n"
-        f"📌 *PUNKTLAR \\(hammasi hal qilinishi shart\\):*\n\n"
-        f"{punkt_text}\n\n"
-        f"⏱ Vaqt: \\~2 daqiqa\n\n"
-        f"Tayyor bo'lsangiz bosing 👇",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("▶️ Boshlash", callback_data="rp_start_dialog")],
-            [InlineKeyboardButton("↩️ Mavzularga qaytish", callback_data=f"rp_level_{context.user_data.get('rp_level', 'a1')}")],
-        ])
-    )
-    return ROLEPLAY_RULES
-
-
-async def _roleplay_start_with_topic(query, context, level: str, topic: str) -> int:
-    """Berilgan mavzu bilan rolli o'yin boshlash (lug'atdan kelganda)"""
-    punkte = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi. TELC Sprechen uslubi."},
-        {"role": "user", "content": (
-            f"'{topic}' mavzusida birgalikda rejalashtirish uchun 5 ta punkt ber. "
-            'JSON: {"punkte": ["1. ...", "2. ...", "3. ...", "4. ...", "5. ..."]}'
-        )},
-    ])
-    context.user_data["rp_punkte"] = punkte.get("punkte", ROLEPLAY_PUNKTE["default"])
-    context.user_data["rp_topic"] = topic
-    context.user_data["rp_level"] = level
-
-    return await _roleplay_show_rules(query, context, level, topic)
-
-
-async def roleplay_start_dialog(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Dialog boshlash — AI birinchi salom beradi"""
-    query = update.callback_query
-    await query.answer()
-
-    topic = context.user_data.get("rp_topic", "Geburtstag feiern")
-    level = context.user_data.get("rp_level", "a1")
-    punkte = context.user_data.get("rp_punkte", ROLEPLAY_PUNKTE["default"])
-
-    punkt_1 = punkte[0] if punkte else "Wo soll es stattfinden?"
-
-    context.user_data["roleplay"] = {
-        "topic": topic, "level": level,
-        "punkte": punkte, "messages": [],
-        "turns": 0, "resolved_punkte": [],
-    }
-
-    ai_start = await groq_chat([
-        {"role": "system", "content": (
-            f"Sen A'ning roli — oddiy nemis tilida gaplashuvchi shaxs. "
-            f"Biz '{topic}' ni birgalikda rejalashtiryapmiz. "
-            f"Salom berib, birinchi punktdan boshlang: {punkt_1}. "
-            f"Qisqa, natural, {level.upper()} darajasiga mos. 2-3 gap."
-        )},
-        {"role": "user", "content": "Start"},
-    ], max_tokens=256)
-
-    context.user_data["roleplay"]["messages"] = [
-        {"role": "assistant", "content": ai_start}
+# ==================== COMMON HANDLERS ====================
+    common_handlers = [
+        # Asosiy navigatsiya
+        CallbackQueryHandler(main_menu_handler,    pattern=f"^{CB.MAIN_MENU}$"),
+        CallbackQueryHandler(level_select_handler, pattern=f"^{CB.LEVEL_SELECT}$"),
+        CallbackQueryHandler(level_a1_handler,     pattern=f"^{CB.LEVEL_A1}$"),
+        CallbackQueryHandler(level_a2_handler,     pattern=f"^{CB.LEVEL_A2}$"),
+        CallbackQueryHandler(level_b1_handler,     pattern=f"^{CB.LEVEL_B1}$"),
+        CallbackQueryHandler(level_b2_handler,     pattern=f"^{CB.LEVEL_B2}$"),
+        CallbackQueryHandler(level_c1_handler,     pattern=f"^{CB.LEVEL_C1}$"),
+        CallbackQueryHandler(b1_prep_handler,      pattern=f"^{CB.B1_PREP}$"),
+        CallbackQueryHandler(b2_prep_handler,      pattern=f"^{CB.B2_PREP}$"),
+        CallbackQueryHandler(c1_prep_handler,      pattern=f"^{CB.C1_PREP}$"),
+        CallbackQueryHandler(book_select_handler,  pattern=r"^book_(a1|a2|b1|b2|c1)_\w+$"),
+        CallbackQueryHandler(back_book_handler,    pattern=r"^back_book_(a1|a2|b1|b2|c1)$"),
+        CallbackQueryHandler(lektion_handler,      pattern=r"^lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+
+        # Quiz
+        CallbackQueryHandler(quiz_start_handler,   pattern=r"^quiz_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        CallbackQueryHandler(quiz_know_handler,    pattern=f"^{CB.QUIZ_KNOW}$"),
+        CallbackQueryHandler(quiz_dontknow_handler,pattern=f"^{CB.QUIZ_DONTKNOW}$"),
+        CallbackQueryHandler(quiz_repeat_handler,  pattern=f"^{CB.QUIZ_REPEAT}$"),
+
+        # Pomodoro
+        CallbackQueryHandler(pomodoro_start_handler, pattern=r"^pomodoro_start_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+        CallbackQueryHandler(pomodoro_stop_handler,  pattern=f"^{CB.POMODORO_STOP}$"),
+
+        # TTS Lektsiya
+        CallbackQueryHandler(tts_lektion_handler,  pattern=r"^tts_lekt_(a1|a2|b1|b2|c1)_\w+_\d+$"),
+
+        # Tarjimon
+        CallbackQueryHandler(translator_handler,   pattern=f"^{CB.TRANSLATOR}$"),
+        CallbackQueryHandler(uzb_deu_handler,      pattern=f"^{CB.UZB_DEU}$"),
+        CallbackQueryHandler(deu_uzb_handler,      pattern=f"^{CB.DEU_UZB}$"),
+        CallbackQueryHandler(tts_translate_handler,pattern=r"^tts_translate_"),
+
+        # Yordam
+        CallbackQueryHandler(help_handler,         pattern=f"^{CB.HELP}$"),
+
+        # ========== AI MENTOR ==========
+        CallbackQueryHandler(ai_mentor_menu_handler, pattern=f"^{CB.AI_MENTOR_MENU}$"),
+
+        # Level detection
+        CallbackQueryHandler(level_detect_start,   pattern=f"^{CB.AI_LEVEL_DETECT}$"),
+        CallbackQueryHandler(level_detect_process, pattern=r"^level_skip_\d+$"),
+        CallbackQueryHandler(ld_show_section,      pattern=r"^ld_show_(tushuntirish|tarjima|yaxshilash)$"),
+        CallbackQueryHandler(ld_speak_handler,     pattern=r"^ld_speak$"),
+
+        # Vorstellen
+        CallbackQueryHandler(vorstellen_start,     pattern=f"^{CB.AI_VORSTELLEN}$"),
+        CallbackQueryHandler(vorstellen_process,   pattern=r"^vorstellen_"),
+        CallbackQueryHandler(vs_show_section,      pattern=r"^vs_show_(tushuntirish|tarjima|yaxshilash)$"),
+        CallbackQueryHandler(vs_speak_handler,     pattern=r"^vs_speak$"),
+
+        # Erfahrungen
+        CallbackQueryHandler(erfahrungen_menu,       pattern=f"^{CB.AI_ERFAHRUNGEN}$"),
+        CallbackQueryHandler(erfahrungen_topic,      pattern=r"^erf_topic_\w+$"),
+        CallbackQueryHandler(erfahrungen_start_chat, pattern=r"^erf_diff_\w+_(easy|medium|hard)$"),
+        CallbackQueryHandler(erfahrungen_chat,       pattern=r"^erf_finish$"),
+
+        # Mistake bank
+        CallbackQueryHandler(mistake_bank_menu,      pattern=f"^{CB.AI_MISTAKE_BANK}$"),
+        CallbackQueryHandler(mistake_list,           pattern=r"^mistake_list$"),
+        CallbackQueryHandler(mistake_mini_lesson,    pattern=r"^mistake_lesson_\d+$"),
+        CallbackQueryHandler(mistake_speak_handler,  pattern=r"^mistake_speak_\d+$"),
+        CallbackQueryHandler(mistake_improve_handler,pattern=r"^mistake_improve_\d+$"),
+        CallbackQueryHandler(mistake_practice,       pattern=r"^mistake_practice_\d+$"),
+        CallbackQueryHandler(mistake_master,         pattern=r"^mistake_master_\d+$"),
+        CallbackQueryHandler(mistake_random,         pattern=r"^mistake_random$"),
+
+        # Voice vocab (YANGI nomlar)
+        CallbackQueryHandler(voice_vocab_menu,         pattern=f"^{CB.AI_VOICE_VOCAB}$"),
+        CallbackQueryHandler(voice_vocab_level_select, pattern=r"^vocab_level_(a1|a2|b1|b2)$"),
+        CallbackQueryHandler(voice_vocab_topic_select, pattern=r"^vocab_topic_(a1|a2|b1|b2)_\d+$"),
+        CallbackQueryHandler(vocab_test_start,         pattern=r"^vocab_test_start$"),
+        CallbackQueryHandler(vocab_test_process,       pattern=r"^(vocab_skip|vocab_test_finish)$"),
+        CallbackQueryHandler(vocab_sprechen,           pattern=r"^vocab_sprechen$"),
+        CallbackQueryHandler(vocab_speak_story,        pattern=r"^vocab_speak_story$"),
+        CallbackQueryHandler(vocab_sprechen_ready,     pattern=r"^vocab_sprechen_ready$"),
+        CallbackQueryHandler(vocab_roleplay_from_vocab,pattern=r"^vocab_roleplay$"),
+
+        # Roleplay (YANGI nomlar)
+        CallbackQueryHandler(roleplay_menu,          pattern=f"^{CB.AI_ROLEPLAY}$"),
+        CallbackQueryHandler(roleplay_level_select,  pattern=r"^rp_level_(a1|a2|b1|b2)$"),
+        CallbackQueryHandler(roleplay_topic_select,  pattern=r"^rp_topic_(a1|a2|b1|b2)_\d+$"),
+        CallbackQueryHandler(roleplay_start_dialog,  pattern=r"^rp_start_dialog$"),
+        CallbackQueryHandler(roleplay_chat,          pattern=r"^rp_finish$"),
+
+        # ========== PROGRESS ==========
+        CallbackQueryHandler(progress_menu,     pattern=f"^{CB.PROGRESS_MENU}$"),
+        CallbackQueryHandler(progress_charts,   pattern=f"^{CB.PROGRESS_CHARTS}$"),
+        CallbackQueryHandler(progress_missions, pattern=f"^{CB.PROGRESS_MISSIONS}$"),
+        CallbackQueryHandler(progress_levelup,  pattern=f"^{CB.PROGRESS_LEVELUP}$"),
+
+        # Tarjimon AI tahlil
+        CallbackQueryHandler(translator_handler, pattern=r"^translator_ai_analysis$"),
+
+        # ========== SETTINGS ==========
+        CallbackQueryHandler(settings_menu,      pattern=f"^{CB.SETTINGS_MENU}$"),
+        CallbackQueryHandler(settings_level,     pattern=f"^{CB.SETTINGS_LEVEL}$"),
+        CallbackQueryHandler(settings_set_level, pattern=r"^set_level_(a1|a2|b1|b2|c1)$"),
+        CallbackQueryHandler(settings_voice,     pattern=f"^{CB.SETTINGS_VOICE}$"),
+        CallbackQueryHandler(settings_set_voice, pattern=r"^set_voice_(female|male)$"),
+        CallbackQueryHandler(settings_speed,     pattern=f"^{CB.SETTINGS_SPEED}$"),
+        CallbackQueryHandler(settings_set_speed, pattern=r"^set_speed_[\d.]+$"),
+        CallbackQueryHandler(settings_mistakes,  pattern=f"^{CB.SETTINGS_MISTAKES}$"),
     ]
 
-    await query.edit_message_text(
-        f"🎭 *{esc_md(topic)}*\n\n"
-        f"🤖 *AI:* {esc_md(ai_start)}\n\n"
-        f"*Javobingizni yozing yoki 🎙️ ovoz yuboring\\!*",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="rp_finish")],
-        ])
+    voice_filter = filters.VOICE | filters.AUDIO
+
+    # ==================== CONVERSATION HANDLER ====================
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            # ===== ONBOARDING STATES — TUZATISH ASOSIY JOYI =====
+            # Avval bu ikki handler ConversationHandler TASHQARISIDA edi,
+            # shuning uchun REG_CHANNEL state da "check_sub" bosilganda
+            # ConversationHandler uni tutib ololmas va xato berardi.
+            # Endi to'g'ri joyda — state ichida.
+            REG_PHONE: [
+                MessageHandler(filters.CONTACT, reg_phone_handler),
+            ],
+            REG_CHANNEL: [
+                CallbackQueryHandler(check_sub_handler, pattern="^check_sub$"),
+            ],
+
+            # ===== ASOSIY STATLAR =====
+            MAIN_MENU:      reply_keyboard_handlers + common_handlers,
+            LEVEL_SELECT:   reply_keyboard_handlers + common_handlers,
+            A1_MENU:        reply_keyboard_handlers + common_handlers,
+            A2_MENU:        reply_keyboard_handlers + common_handlers,
+            B1_MENU:        reply_keyboard_handlers + common_handlers,
+            B2_MENU:        reply_keyboard_handlers + common_handlers,
+            C1_MENU:        reply_keyboard_handlers + common_handlers,
+            BOOK_MENU:      reply_keyboard_handlers + common_handlers,
+            LEKTION_PAGE:   reply_keyboard_handlers + common_handlers,
+            TRANSLATOR:     reply_keyboard_handlers + common_handlers,
+            QUIZ_STATE:     reply_keyboard_handlers + common_handlers,
+            POMODORO_STATE: reply_keyboard_handlers + common_handlers,
+
+            # Tarjimon matn kiritish
+            UZB_DEU_INPUT: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+            ],
+            DEU_UZB_INPUT: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
+            ],
+
+            # ===== AI MENTOR STATES =====
+            AI_MENTOR_MENU: reply_keyboard_handlers + common_handlers,
+
+            # Level detection — matn VA ovoz
+            LEVEL_DETECT_Q1: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
+                MessageHandler(voice_filter, level_detect_process),
+            ],
+            LEVEL_DETECT_Q2: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
+                MessageHandler(voice_filter, level_detect_process),
+            ],
+            LEVEL_DETECT_Q3: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
+                MessageHandler(voice_filter, level_detect_process),
+            ],
+            LEVEL_DETECT_Q4: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
+                MessageHandler(voice_filter, level_detect_process),
+            ],
+            LEVEL_DETECT_Q5: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
+                MessageHandler(voice_filter, level_detect_process),
+            ],
+            LEVEL_DETECT_RESULT: reply_keyboard_handlers + common_handlers,
+
+            # Vorstellen — matn VA ovoz
+            VORSTELLEN_START: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
+                MessageHandler(voice_filter, vorstellen_process),
+            ],
+            VORSTELLEN_FOLLOWUP: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
+                MessageHandler(voice_filter, vorstellen_process),
+            ],
+            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers,
+
+            # Erfahrungen — matn VA ovoz
+            ERFAHRUNGEN_MENU:       reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_TOPIC:      reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_DIFFICULTY: reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_CHAT: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, erfahrungen_chat),
+                MessageHandler(voice_filter, erfahrungen_chat),
+            ],
+            ERFAHRUNGEN_RESULT: reply_keyboard_handlers + common_handlers,
+
+            # Mistake bank
+            MISTAKE_BANK_MENU:  reply_keyboard_handlers + common_handlers,
+            MISTAKE_REVIEW:     reply_keyboard_handlers + common_handlers,
+            MISTAKE_MINILESSON: reply_keyboard_handlers + common_handlers,
+            MISTAKE_PRACTICE: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, mistake_practice_process),
+            ],
+
+            # Voice vocab
+            VOICE_VOCAB_MENU:  reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_LEVEL: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_TOPIC: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_WORDS: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_TEST: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vocab_test_process),
+                MessageHandler(voice_filter, vocab_test_process),
+            ],
+            VOICE_VOCAB_SPRECHEN: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(voice_filter, vocab_sprechen_process),
+            ],
+
+            # Roleplay — matn VA ovoz
+            ROLEPLAY_MENU:  reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_LEVEL: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_TOPIC: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_RULES: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_CHAT: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, roleplay_chat),
+                MessageHandler(voice_filter, roleplay_chat),
+            ],
+            ROLEPLAY_RESULT:    reply_keyboard_handlers + common_handlers,
+            AI_MENTOR_SETTINGS: reply_keyboard_handlers + common_handlers,
+        },
+        fallbacks=[
+            CommandHandler("start", start),
+            CommandHandler("menu", menu_command),
+            CommandHandler("help", help_command),
+        ],
+        per_message=False,
+        allow_reentry=True,
     )
 
-    # AI gapini ovozda ham yuborish
-    await speak_text(query, ai_start, voice="female", speed=1.0)
+    application.add_handler(conv_handler)
 
-    return ROLEPLAY_CHAT
+    # Qo'shimcha buyruqlar
+    application.add_handler(CommandHandler("menu", menu_command))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("admin", admin_panel))
 
+    # Pastki ReplyKeyboard tugmalari
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📖 Kunlik so'z$"), daily_word_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🤖 AI Mentor$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📊 Progressim$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🌐 Tarjimon$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^ℹ️ Yordam$"), reply_menu_handler
+    ))
 
-async def roleplay_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Rolli o'yin suhbati"""
-    rp_data = context.user_data.get("roleplay", {})
-    turns = rp_data.get("turns", 0)
+    # Admin panel tugmalari
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^👥 Foydalanuvchilar$"), admin_users_list
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🔍 Raqam izlash$"), admin_search_phone
+    ))
 
-    if update.callback_query and update.callback_query.data == "rp_finish":
-        return await roleplay_result(update, context)
+    # Admin qidiruv natijasi (faqat admin_search flag True bo'lganda ishlaydi)
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_IDS), admin_search_result
+    ), group=10)
 
-    # Ovozli yoki matnli
-    if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-        user_msg = await listen_to_voice(update)
-        await loading.delete()
-    elif update.message and update.message.text:
-        user_msg = update.message.text.strip()
-    else:
-        return ROLEPLAY_CHAT
+    # Ovozli xabarlar fallback (ConversationHandler tashqarisida)
+    application.add_handler(MessageHandler(voice_filter, voice_message_handler))
 
-    rp_data["messages"].append({"role": "user", "content": user_msg})
-    turns += 1
-    rp_data["turns"] = turns
+    print("🤖 ==========================================")
+    print("🤖   DEUTSCH MEISTER PRO ishga tushdi!")
+    print("🤖 ==========================================")
+    print(f"🤖 Token: {TOKEN[:10]}...")
+    print(f"🤖 Groq API: {'✅ Mavjud' if GROQ_API_KEY else '❌ Mavjud emas!'}")
+    print("🤖 ==========================================")
 
-    if turns >= 7:
-        return await roleplay_result(update, context)
-
-    topic = rp_data.get("topic", "")
-    level = rp_data.get("level", "a1")
-    punkte = rp_data.get("punkte", [])
-    resolved = rp_data.get("resolved_punkte", [])
-    remaining = [p for i, p in enumerate(punkte) if i not in resolved]
-
-    system_msg = {
-        "role": "system",
-        "content": (
-            f"Sen A'ning roli. '{topic}' rejalashtiryapmiz. {level.upper()} darajasi. "
-            f"Qolgan punktlar: {remaining}. "
-            f"Keyingi punktni taklif qil yoki kelish. Qisqa natural 2-3 gap."
-        )
-    }
-
-    ai_response = await groq_chat(
-        [system_msg] + rp_data["messages"][-6:],
-        max_tokens=256
-    )
-    rp_data["messages"].append({"role": "assistant", "content": ai_response})
-
-    await update.message.reply_text(
-        f"🤖 *AI:* {esc_md(ai_response)}\n\n"
-        f"*\\({turns}/7\\)* \\-\\> Javobingizni yozing:",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏹️ Tugatish", callback_data="rp_finish")],
-        ])
-    )
-
-    await speak_text(update, ai_response, voice="female", speed=1.0)
-    return ROLEPLAY_CHAT
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
-async def roleplay_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Rolli o'yin yakuniy natijasi + so'zlar ro'yxati"""
-    rp_data = context.user_data.get("roleplay", {})
-    messages = rp_data.get("messages", [])
-    topic = rp_data.get("topic", "")
-    turns = rp_data.get("turns", 0)
-
-    await (update.callback_query.edit_message_text if update.callback_query
-           else update.message.reply_text)(
-        "🧠 *AI tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2"
-    )
-
-    analysis = await groq_json([
-        {"role": "system", "content": "Nemis tili o'qituvchisi. Suhbatni batafsil tahlil qil."},
-        {"role": "user", "content": (
-            f"Mavzu: {topic}\nSuhbat: {messages}\n\n"
-            'JSON: {"score": 0-10, "fluency": 0-10, '
-            '"good_points": ["...", "..."], "improve": ["...", "..."], '
-            '"aktiv_sozlar": ["so\'z1", "so\'z2", "so\'z3", "so\'z4", "so\'z5"], '
-            '"passiv_sozlar": ["so\'z1", "so\'z2", "so\'z3"], '
-            '"asosiy_birikmalar": ["birizma1", "birizma2", "birizma3"]}'
-        )},
-    ])
-
-    user_id = (update.callback_query.from_user.id if update.callback_query else update.effective_user.id)
-    db = get_db()
-    score = analysis.get("score", 5)
-    db.add_xp(user_id, XP_REWARDS.get("roleplay_complete", 40), "roleplay", topic)
-
-    good_points = "\n".join([f"✅ {esc_md(p)}" for p in analysis.get("good_points", [])])
-    improve = "\n".join([f"⚠️ {esc_md(i)}" for i in analysis.get("improve", [])])
-    aktiv = ", ".join([esc_md(w) for w in analysis.get("aktiv_sozlar", [])])
-    passiv = ", ".join([esc_md(w) for w in analysis.get("passiv_sozlar", [])])
-    birikmalar = "\n".join([f"• {esc_md(b)}" for b in analysis.get("asosiy_birikmalar", [])])
-
-    text = (
-        f"🏁 *Rolli o'yin tugadi\\! — {esc_md(topic)}*\n\n"
-        f"⭐ *Ball: {score}/10*\n"
-        f"💬 *Suvliklik: {analysis.get('fluency', 5)}/10*\n\n"
-        f"{good_points}\n\n"
-        f"{improve}\n\n"
-        f"📚 *AKTIV SO'ZLAR \\(ishlating\\):*\n{aktiv}\n\n"
-        f"📖 *PASSIV SO'ZLAR \\(biling\\):*\n{passiv}\n\n"
-        f"🔑 *ASOSIY BIRIKMALAR:*\n{birikmalar}\n\n"
-        f"⚠️ *ESLATMA: Ertaga tekshiraman\\!*\n"
-        f"Bu so'zlarni yodlang \\— ertaga tekshiruv bo'ladi 🎯\n\n"
-        f"🎁 *\\+{XP_REWARDS.get('roleplay_complete', 40)} XP*"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔁 Qayta o'ynash", callback_data=f"rp_level_{rp_data.get('level', 'a1')}")],
-        [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
-    ])
-
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-    else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-
-    return AI_MENTOR_MENU
-
-
-# ==================== AI MENTOR MENU HANDLER ====================
-
-async def ai_mentor_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """AI Mentor asosiy menyusi"""
-    query = update.callback_query
-    await query.answer()
-
-    await query.edit_message_text(
-        "🤖 *AI Mentor*\n\n"
-        "*Imkoniyatlar:*\n\n"
-        "🎯 *Darajani aniqlash* \\- 5 ta savol bilan darajangizni bilib oling\n"
-        "🎤 *Vorstellen* \\- O'zingizni taqdim etish mashqi \\(3 tugma tahlil\\)\n"
-        "💬 *Erfahrungen* \\- B2/C1 mavzularida suhbatlashish\n"
-        "🔧 *Xato banki* \\- Xatolaringizni saqlash va mini\\-darslar\n"
-        "📚 *Ovozli lug'at* \\- A1/A2/B1/B2, 20 mavzu, 25 so'z\n"
-        "🎭 *Rolli o'yinlar* \\- TELC/Goethe uslubi, 20 mavzu\n\n"
-        "*Bo'limni tanlang:*",
-        parse_mode="MarkdownV2",
-        reply_markup=ai_mentor_menu_keyboard(),
-    )
-    return AI_MENTOR_MENU
+if __name__ == "__main__":
+    main()
