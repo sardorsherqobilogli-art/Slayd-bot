@@ -420,13 +420,26 @@ async def show_quiz_card(query, context):
 # ==================== HANDLERS ====================
 
 async def check_channel_membership(user_id: int, context) -> bool:
+    """
+    Kanal a'zoligini tekshirish.
+    MUHIM: Bot kanalda ADMIN bo'lishi shart! Aks holda xato beradi.
+    Agar bot admin emas bo'lsa, foydalanuvchini o'tkazib yuboramiz
+    (logga yozib, bloklamaslik uchun).
+    """
     try:
         member = await context.bot.get_chat_member(
             chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id
         )
         return member.status not in ["left", "kicked", "banned"]
-    except Exception:
-        return False
+    except Exception as e:
+        # Bot kanalda admin emas yoki kanalga qo'shilmagan
+        logger.warning(
+            f"Kanal a'zoligini tekshirishda xato: {e}. "
+            f"Bot kanalda admin emasmi? (@{CHANNEL_USERNAME})"
+        )
+        # Kanal egasi emassiz, shuning uchun tekshira olmaymiz — 
+        # foydalanuvchini bloklamaslik uchun True qaytaramiz
+        return True
 
 
 async def ask_channel_subscribe(update, context) -> int:
@@ -508,7 +521,7 @@ async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = query.from_user.id
     is_member = await check_channel_membership(user_id, context)
     if not is_member:
-        await query.answer("❌ Hali a'zo emassiz! Kanalga kiring.", show_alert=True)
+        await query.answer("❌ Kanalga a'zo bo'ling! Agar a'zo bo'lsangiz, 5 soniya kutib qayta bosing.", show_alert=True)
         return REG_CHANNEL
     db = get_db()
     user = db.get_or_create_user(user_id)
