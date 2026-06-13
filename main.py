@@ -122,7 +122,11 @@ from settings import (
 
 # ==================== PASTKI DOIMIY MENYU ====================
 REPLY_KEYBOARD = ReplyKeyboardMarkup(
-    [[KeyboardButton("📚 Menyu")]],
+    [
+        ["📚 Menyu", "📖 Kunlik so'z"],
+        ["🤖 AI Mentor", "📊 Progressim"],
+        ["🌐 Tarjimon", "ℹ️ Yordam"],
+    ],
     resize_keyboard=True,
     is_persistent=True,
 )
@@ -140,7 +144,17 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
     POMODORO_STATE,
     UZB_DEU_INPUT,
     DEU_UZB_INPUT,
-) = range(14)
+    # Onboarding
+    REG_PHONE,
+    REG_CHANNEL,
+    # Admin
+    ADMIN_STATE,
+) = range(17)
+
+# ==================== ADMIN CONFIG ====================
+ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "0").split(",") if x.strip().isdigit()]
+CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "sprechenmitspass")
+CHANNEL_LINK = f"https://t.me/{CHANNEL_USERNAME}"
 
 
 # ==================== CALLBACK CONSTANTS ====================
@@ -405,41 +419,213 @@ async def show_quiz_card(query, context):
 
 # ==================== HANDLERS ====================
 
+async def check_channel_membership(user_id: int, context) -> bool:
+    try:
+        member = await context.bot.get_chat_member(
+            chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id
+        )
+        return member.status not in ["left", "kicked", "banned"]
+    except Exception:
+        return False
+
+
+async def ask_channel_subscribe(update, context) -> int:
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Kanalga o'tish →", url=CHANNEL_LINK)],
+        [InlineKeyboardButton("✅ Obunani tekshirish", callback_data="check_sub")],
+    ])
+    msg = (
+        "🎯 *Bir qadam qoldi\\!*\n\n"
+        "Kanalimizga a'zo bo'ling — u yerda har kuni:\n"
+        "• 📖 Foydali materiallar\n"
+        "• 🎧 Audio darslar\n"
+        "• 💡 Nemis tili sirlari\n\n"
+        "_A'zo bo'lgach, Obunani tekshirish ni bosing\\._"
+    )
+    if update.message:
+        await update.message.reply_text(msg, parse_mode="MarkdownV2", reply_markup=keyboard)
+    elif update.callback_query:
+        await update.callback_query.edit_message_text(msg, parse_mode="MarkdownV2", reply_markup=keyboard)
+    return REG_CHANNEL
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = update.effective_user.id
-    username = update.effective_user.username
-    first_name = update.effective_user.first_name
-    last_name = update.effective_user.last_name
-
+    first_name = update.effective_user.first_name or "Do'stim"
     db = get_db()
     user = db.get_or_create_user(
-        user_id=user_id, username=username,
-        first_name=first_name, last_name=last_name,
+        user_id=user_id,
+        username=update.effective_user.username,
+        first_name=first_name,
+        last_name=update.effective_user.last_name,
     )
+    if not user.get("phone"):
+        phone_btn = KeyboardButton("📱 Telefon raqamimni ulashish", request_contact=True)
+        kb = ReplyKeyboardMarkup([[phone_btn]], resize_keyboard=True, one_time_keyboard=True)
+        await update.message.reply_text(
+            f"👋 Salom, *{esc_md(first_name)}\\!*\n\n"
+            "Sprechen mit Spaß botiga xush kelibsiz\\! 🎉\n\n"
+            "Birga nemis tilini o'rganamiz — qiziqarli va samarali\\! 🇩🇪\n\n"
+            "Davom etish uchun telefon raqamingizni ulashing\\. 🔒",
+            parse_mode="MarkdownV2",
+            reply_markup=kb,
+        )
+        return REG_PHONE
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        return await ask_channel_subscribe(update, context)
+    return await _show_welcome(update, context, user, first_name)
+
+
+async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    contact = update.message.contact
+    if not contact:
+        await update.message.reply_text("Iltimos, pastdagi tugmani bosing 👇")
+        return REG_PHONE
+    user_id = update.effective_user.id
+    db = get_db()
+    try:
+        db.update_user_phone(user_id, contact.phone_number)
+    except Exception:
+        pass
+    await update.message.reply_text("✅ *Rahmat\\!* Raqamingiz saqlandi 🙏", parse_mode="MarkdownV2")
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        return await ask_channel_subscribe(update, context)
+    user = db.get_or_create_user(user_id)
+    first_name = update.effective_user.first_name or "Do'stim"
+    return await _show_welcome(update, context, user, first_name)
+
+
+async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    is_member = await check_channel_membership(user_id, context)
+    if not is_member:
+        await query.answer("❌ Hali a'zo emassiz! Kanalga kiring.", show_alert=True)
+        return REG_CHANNEL
+    db = get_db()
+    user = db.get_or_create_user(user_id)
     db.generate_daily_missions(user_id)
-
+    first_name = query.from_user.first_name or "Do'stim"
     text = (
-        f"🎉 *Willkommen, {esc_md(first_name)}* 🇩🇪\n\n"
-        f"*Deutsch Meister Pro* \\- sizning shaxsiy nemis tili murabbiyingiz\\! 🚀\n\n"
-        f"✨ *Imkoniyatlar:*\n"
-        f"🤖 *AI Mentor* \\- Daraja aniqlash, suhbat, xato banki\n"
-        f"📚 *Lektsiyalar* \\- A1\\-C1 darajalar bo'yicha\n"
-        f"🧠 *Flashcard* \\- Vizual yodlash testlari\n"
-        f"🍅 *Pomodoro* \\- Fokuslangan o'qish\n"
-        f"🌐 *Tarjimon* \\- UZB↔DEU \\+ AI tahlil\n"
-        f"📊 *Progress* \\- XP tizimi va grafiklar\n"
-        f"🎙️ *Ovozli* \\- Edge TTS \\+ Whisper STT\n\n"
-        f"📊 *Sizning darajangiz: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
-        f"Tayyormisiz? Pastdagi bo'limlardan birini tanlang\\! 👇"
+        f"🎉 *Salom, {esc_md(first_name)}\\!* 🇩🇪\n\n"
+        "Sprechen mit Spaß ga xush kelibsiz\\!\n\n"
+        f"📊 Darajangiz: *{esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
+        "Qayerdan boshlaymiz\\? 👇"
+    )
+    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+    await query.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    return MAIN_MENU
+
+
+async def _show_welcome(update, context, user, first_name) -> int:
+    db = get_db()
+    db.generate_daily_missions(update.effective_user.id)
+    text = (
+        f"🎉 *Salom, {esc_md(first_name)}\\!* 🇩🇪\n\n"
+        "Sprechen mit Spaß ga xush kelibsiz\\!\n\n"
+        f"📊 Darajangiz: *{esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}*\n\n"
+        "Qayerdan boshlaymiz\\? 👇"
+    )
+    await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
+    await update.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    return MAIN_MENU
+
+
+# ==================== KUNLIK SOZ ====================
+DAILY_WORDS = [
+    ("der Mut", "jasorat"), ("die Hoffnung", "umid"), ("das Glück", "baxt"),
+    ("die Freiheit", "erkinlik"), ("der Traum", "orzu"), ("die Stärke", "kuch"),
+    ("das Vertrauen", "ishonch"), ("die Geduld", "sabr"), ("der Erfolg", "muvaffaqiyat"),
+    ("die Liebe", "sevgi"), ("das Wissen", "bilim"), ("die Zeit", "vaqt"),
+    ("der Weg", "yo'l"), ("die Freundschaft", "do'stlik"), ("das Leben", "hayot"),
+    ("der Sommer", "yoz"), ("die Musik", "musiqa"), ("das Herz", "yurak"),
+    ("die Reise", "sayohat"), ("der Frieden", "tinchlik"),
+]
+
+async def daily_word_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    import datetime as dt
+    today = dt.date.today().toordinal()
+    word, meaning = DAILY_WORDS[today % len(DAILY_WORDS)]
+    await update.message.reply_text(
+        f"📖 *Bugungi so'z:*\n\n"
+        f"🇩🇪 *{esc_md(word)}*\n"
+        f"🇺🇿 _{esc_md(meaning)}_\n\n"
+        "_Bugun 5 marta ishlatib ko'ring\\!_ 💪",
+        parse_mode="MarkdownV2",
+        reply_markup=main_menu_keyboard(),
     )
 
-    if update.message:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
-        await update.message.reply_text("👇 Pastdagi tugmadan foydalaning:", reply_markup=REPLY_KEYBOARD)
-    elif update.callback_query:
-        await update.callback_query.answer()
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
-    return MAIN_MENU
+
+# ==================== ADMIN PANEL ====================
+async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        return
+    kb = ReplyKeyboardMarkup(
+        [["👥 Foydalanuvchilar", "🔍 Raqam izlash"], ["🏠 Asosiy menyu"]],
+        resize_keyboard=True,
+    )
+    db = get_db()
+    try:
+        total = db.get_user_count()
+    except Exception:
+        total = "?"
+    await update.message.reply_text(
+        f"🔐 *Admin Panel*\n\n👥 Jami: *{total}* ta\n\nBo'limni tanlang:",
+        parse_mode="MarkdownV2", reply_markup=kb,
+    )
+
+async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in ADMIN_IDS:
+        return
+    db = get_db()
+    try:
+        users = db.get_all_users_for_admin()
+    except Exception:
+        await update.message.reply_text("❌ Xato.")
+        return
+    if not users:
+        await update.message.reply_text("Hali foydalanuvchilar yo'q.")
+        return
+    for i in range(0, len(users), 20):
+        chunk = users[i:i+20]
+        lines = [f"👥 *{i+1}\\-{min(i+20,len(users))} / {len(users)} ta*\n"]
+        for j, u in enumerate(chunk, i+1):
+            fname = esc_md(u.get("first_name") or "—")
+            phone = esc_md(u.get("phone") or "—")
+            tg = esc_md("@"+u["username"] if u.get("username") else "—")
+            lines.append(f"{j}\\. {fname} | 📱{phone} | {tg}")
+        await update.message.reply_text("\n".join(lines), parse_mode="MarkdownV2")
+
+async def admin_search_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS:
+        return
+    await update.message.reply_text("🔍 Telefon raqamini yozing:")
+    context.user_data["admin_search"] = True
+
+async def admin_search_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in ADMIN_IDS or not context.user_data.get("admin_search"):
+        return
+    context.user_data["admin_search"] = False
+    q = update.message.text.strip()
+    db = get_db()
+    try:
+        users = db.search_by_phone(q)
+    except Exception:
+        users = []
+    if not users:
+        await update.message.reply_text(f"❌ '{q}' topilmadi.")
+        return
+    for u in users:
+        await update.message.reply_text(
+            f"✅ Topildi!\n👤 {u.get('first_name') or '—'}\n"
+            f"📱 {u.get('phone') or '—'}\n"
+            f"TG: {'@'+u['username'] if u.get('username') else '—'}"
+        )
 
 
 async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1238,20 +1424,52 @@ def main() -> None:
 
     application.add_handler(conv_handler)
 
-    # Qo'shimcha buyruqlar (ConversationHandler tashqarida ham ishlaydi)
+    # Qo'shimcha buyruqlar
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("admin", admin_panel))
 
-    # Pastki menyu tugmasi
+    # Onboarding — telefon raqami (ConversationHandler tashqarida)
+    application.add_handler(MessageHandler(filters.CONTACT, reg_phone_handler))
+
+    # Kanal obuna tekshirish
+    application.add_handler(CallbackQueryHandler(check_sub_handler, pattern="^check_sub$"))
+
+    # Pastki ReplyKeyboard tugmalari
     application.add_handler(MessageHandler(
         filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler
     ))
-
-    # Ovozli xabarlar — faqat ConversationHandler tashqarida (fallback)
-    # ConversationHandler ichida tegishli state handler lari ishlaydi
     application.add_handler(MessageHandler(
-        voice_filter, voice_message_handler
+        filters.TEXT & filters.Regex("^📖 Kunlik so'z$"), daily_word_handler
     ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🤖 AI Mentor$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^📊 Progressim$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🌐 Tarjimon$"), reply_menu_handler
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^ℹ️ Yordam$"), reply_menu_handler
+    ))
+
+    # Admin panel tugmalari
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^👥 Foydalanuvchilar$"), admin_users_list
+    ))
+    application.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex("^🔍 Raqam izlash$"), admin_search_phone
+    ))
+
+    # Admin qidiruv natijasi
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND, admin_search_result
+    ), group=10)
+
+    # Ovozli xabarlar fallback
+    application.add_handler(MessageHandler(voice_filter, voice_message_handler))
 
     print("🤖 ==========================================")
     print("🤖   DEUTSCH MEISTER PRO ishga tushdi!")
