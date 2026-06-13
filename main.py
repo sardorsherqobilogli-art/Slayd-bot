@@ -157,6 +157,32 @@ CHANNEL_USERNAME = os.environ.get("CHANNEL_USERNAME", "sprechenmitspass")
 CHANNEL_LINK = f"https://t.me/{CHANNEL_USERNAME}"
 
 
+
+# ==================== KEYBOARD & STATE HELPERS ====================
+async def clear_last_keyboard(context, chat_id):
+    """Eski inline keyboardni o'chirish (tugmachalar chalkashmasligi uchun)"""
+    last_msg_id = context.user_data.get("last_inline_msg_id")
+    if last_msg_id and chat_id:
+        try:
+            await context.bot.edit_message_reply_markup(
+                chat_id=chat_id, message_id=last_msg_id, reply_markup=None
+            )
+        except Exception:
+            pass  # Xabar allaqachon o'chirilgan yoki keyboard yo'q
+
+
+def save_message_id(context, message_id):
+    """Oxirgi inline keyboard xabar ID sini saqlash"""
+    if message_id:
+        context.user_data["last_inline_msg_id"] = message_id
+
+
+def set_user_state(context, state: int, state_name: str = ""):
+    """Foydalanuvchi state'ini kuzatish (debug uchun)"""
+    context.user_data["current_state"] = state
+    if state_name:
+        context.user_data["current_state_name"] = state_name
+
 # ==================== CALLBACK CONSTANTS ====================
 class CB:
     MAIN_MENU = "main_menu"
@@ -420,26 +446,13 @@ async def show_quiz_card(query, context):
 # ==================== HANDLERS ====================
 
 async def check_channel_membership(user_id: int, context) -> bool:
-    """
-    Kanal a'zoligini tekshirish.
-    MUHIM: Bot kanalda ADMIN bo'lishi shart! Aks holda xato beradi.
-    Agar bot admin emas bo'lsa, foydalanuvchini o'tkazib yuboramiz
-    (logga yozib, bloklamaslik uchun).
-    """
     try:
         member = await context.bot.get_chat_member(
             chat_id=f"@{CHANNEL_USERNAME}", user_id=user_id
         )
         return member.status not in ["left", "kicked", "banned"]
-    except Exception as e:
-        # Bot kanalda admin emas yoki kanalga qo'shilmagan
-        logger.warning(
-            f"Kanal a'zoligini tekshirishda xato: {e}. "
-            f"Bot kanalda admin emasmi? (@{CHANNEL_USERNAME})"
-        )
-        # Kanal egasi emassiz, shuning uchun tekshira olmaymiz — 
-        # foydalanuvchini bloklamaslik uchun True qaytaramiz
-        return True
+    except Exception:
+        return False
 
 
 async def ask_channel_subscribe(update, context) -> int:
@@ -463,6 +476,9 @@ async def ask_channel_subscribe(update, context) -> int:
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Botni boshlash. Har doim toza state bilan boshlaydi."""
+    # Oldingi state va keyboardlarni tozalash
+    context.user_data.clear()
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or "Do'stim"
     db = get_db()
@@ -487,6 +503,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     is_member = await check_channel_membership(user_id, context)
     if not is_member:
         return await ask_channel_subscribe(update, context)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
     return await _show_welcome(update, context, user, first_name)
 
 
@@ -507,6 +524,7 @@ async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         return await ask_channel_subscribe(update, context)
     user = db.get_or_create_user(user_id)
     first_name = update.effective_user.first_name or "Do'stim"
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
     return await _show_welcome(update, context, user, first_name)
 
 
@@ -517,12 +535,12 @@ async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 
 async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
-    await query.answer()
     user_id = query.from_user.id
     is_member = await check_channel_membership(user_id, context)
     if not is_member:
-        await query.answer("❌ Kanalga a'zo bo'ling! Agar a'zo bo'lsangiz, 5 soniya kutib qayta bosing.", show_alert=True)
+        await query.answer("❌ Hali a'zo emassiz! Kanalga kiring.", show_alert=True)
         return REG_CHANNEL
+    await query.answer("✅ Tekshirildi!")
     db = get_db()
     user = db.get_or_create_user(user_id)
     db.generate_daily_missions(user_id)
@@ -535,6 +553,7 @@ async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     )
     await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
     await query.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
     return MAIN_MENU
 
 
@@ -549,6 +568,7 @@ async def _show_welcome(update, context, user, first_name) -> int:
     )
     await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=main_menu_keyboard())
     await update.message.reply_text("👇", reply_markup=REPLY_KEYBOARD)
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
     return MAIN_MENU
 
 
@@ -563,7 +583,7 @@ DAILY_WORDS = [
     ("die Reise", "sayohat"), ("der Frieden", "tinchlik"),
 ]
 
-async def daily_word_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def daily_word_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     import datetime as dt
     today = dt.date.today().toordinal()
     word, meaning = DAILY_WORDS[today % len(DAILY_WORDS)]
@@ -575,6 +595,8 @@ async def daily_word_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="MarkdownV2",
         reply_markup=main_menu_keyboard(),
     )
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
+    return MAIN_MENU
 
 
 # ==================== ADMIN PANEL ====================
@@ -652,6 +674,7 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     user_id = query.from_user.id
     db = get_db()
     user = db.get_or_create_user(user_id)
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     await query.edit_message_text(
         "🏠 *Asosiy Menu*\n\n"
         f"📊 Daraja: {esc_md(LEVEL_LABELS.get(user.get('current_level', 'a1'), 'A1'))}\n"
@@ -666,6 +689,7 @@ async def main_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     await query.edit_message_text(
         "📚 *Daraja tanlash*\n\n"
         "O'z darajangizni tanlang:\n"
@@ -678,68 +702,71 @@ async def level_select_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     return LEVEL_SELECT
 
 
-async def _show_books(query, level: str):
+async def _show_books(query, level: str, context):
     label = LEVEL_LABELS.get(level, level)
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     await query.edit_message_text(
         f"{esc_md(label)}\n\nKitob tanlang:",
         parse_mode="MarkdownV2",
         reply_markup=books_keyboard(level),
     )
     state_map = {"a1": A1_MENU, "a2": A2_MENU, "b1": B1_MENU, "b2": B2_MENU, "c1": C1_MENU}
+    set_user_state(context, state_map.get(level, A1_MENU), f"{level.upper()}_MENU")
     return state_map.get(level, A1_MENU)
 
 
 async def level_a1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "a1")
+    return await _show_books(query, "a1", context)
 
 
 async def level_a2_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "a2")
+    return await _show_books(query, "a2", context)
 
 
 async def level_b1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "b1")
+    return await _show_books(query, "b1", context)
 
 
 async def level_b2_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "b2")
+    return await _show_books(query, "b2", context)
 
 
 async def level_c1_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "c1")
+    return await _show_books(query, "c1", context)
 
 
 async def b1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "b1")
+    return await _show_books(query, "b1", context)
 
 
 async def b2_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "b2")
+    return await _show_books(query, "b2", context)
 
 
 async def c1_prep_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
-    return await _show_books(query, "c1")
+    return await _show_books(query, "c1", context)
 
 
 async def book_select_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     parts = query.data.split("_", 2)
     if len(parts) < 3:
         return MAIN_MENU
@@ -761,12 +788,13 @@ async def back_book_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     query = update.callback_query
     await query.answer()
     level = query.data.split("_")[-1]
-    return await _show_books(query, level)
+    return await _show_books(query, level, context)
 
 
 async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
+    await clear_last_keyboard(context, query.message.chat_id if query.message else None)
     parts = query.data.split("_")
     if len(parts) < 4:
         return MAIN_MENU
@@ -792,6 +820,7 @@ async def lektion_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
     ])
     await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    set_user_state(context, BOOK_MENU, "BOOK_MENU")
     return BOOK_MENU
 
 
@@ -810,6 +839,7 @@ async def quiz_start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return BOOK_MENU
     random.shuffle(words)
     set_quiz_state(context, {"words": words, "index": 0, "wrong": [], "total": len(words), "level": level, "book": book, "n": n})
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
     return await show_quiz_card(query, context)
 
 
@@ -819,6 +849,7 @@ async def quiz_know_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     q = get_quiz_state(context)
     q["index"] += 1
     set_quiz_state(context, q)
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
     return await show_quiz_card(query, context)
 
 
@@ -833,6 +864,7 @@ async def quiz_dontknow_handler(update: Update, context: ContextTypes.DEFAULT_TY
         q["wrong"].append((german, uzbek))
     q["index"] += 1
     set_quiz_state(context, q)
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
     return await show_quiz_card(query, context)
 
 
@@ -848,6 +880,7 @@ async def quiz_repeat_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             "total": len(wrong), "level": q.get("level", "a1"),
             "book": q.get("book", "motive"), "n": q.get("n", 1),
         })
+    set_user_state(context, QUIZ_STATE, "QUIZ_STATE")
     return await show_quiz_card(query, context)
 
 
@@ -900,6 +933,7 @@ async def pomodoro_stop_handler(update: Update, context: ContextTypes.DEFAULT_TY
         parse_mode="MarkdownV2",
         reply_markup=keyboard
     )
+    set_user_state(context, MAIN_MENU, "MAIN_MENU")
     return MAIN_MENU
 
 
@@ -1050,7 +1084,9 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
             [InlineKeyboardButton("🏠 Asosiy menu", callback_data=CB.MAIN_MENU)],
         ])
     )
-    return UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
+    next_state = UZB_DEU_INPUT if direction == "uzb_deu" else DEU_UZB_INPUT
+    set_user_state(context, next_state, "TRANSLATOR_INPUT")
+    return next_state
 
 
 async def tts_translate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1124,7 +1160,9 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     )
 
 
-async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Pastki menyu tugmalari — ConversationHandler ichida ishlashi uchun state qaytaradi"""
+    await clear_last_keyboard(context, update.message.chat_id if update.message else None)
     await update.message.reply_text(
         "📋 *Tez buyruqlar:*\n\n"
         "/start \\— Botni qayta boshlash\n"
@@ -1199,7 +1237,17 @@ def main() -> None:
 
     application = Application.builder().token(TOKEN).build()
 
-    # ==================== COMMON HANDLERS ====================
+        # Reply keyboard tugmalari (har bir state'da birinchi tekshiriladi)
+    reply_keyboard_handlers = [
+        MessageHandler(filters.TEXT & filters.Regex("^📚 Menyu$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^📖 Kunlik so\'z$"), daily_word_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^🤖 AI Mentor$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^📊 Progressim$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^🌐 Tarjimon$"), reply_menu_handler),
+        MessageHandler(filters.TEXT & filters.Regex("^ℹ️ Yordam$"), reply_menu_handler),
+    ]
+
+# ==================== COMMON HANDLERS ====================
     common_handlers = [
         # Asosiy navigatsiya
         CallbackQueryHandler(main_menu_handler,    pattern=f"^{CB.MAIN_MENU}$"),
@@ -1326,106 +1374,106 @@ def main() -> None:
             ],
 
             # ===== ASOSIY STATLAR =====
-            MAIN_MENU:      common_handlers,
-            LEVEL_SELECT:   common_handlers,
-            A1_MENU:        common_handlers,
-            A2_MENU:        common_handlers,
-            B1_MENU:        common_handlers,
-            B2_MENU:        common_handlers,
-            C1_MENU:        common_handlers,
-            BOOK_MENU:      common_handlers,
-            LEKTION_PAGE:   common_handlers,
-            TRANSLATOR:     common_handlers,
-            QUIZ_STATE:     common_handlers,
-            POMODORO_STATE: common_handlers,
+            MAIN_MENU:      reply_keyboard_handlers + common_handlers,
+            LEVEL_SELECT:   reply_keyboard_handlers + common_handlers,
+            A1_MENU:        reply_keyboard_handlers + common_handlers,
+            A2_MENU:        reply_keyboard_handlers + common_handlers,
+            B1_MENU:        reply_keyboard_handlers + common_handlers,
+            B2_MENU:        reply_keyboard_handlers + common_handlers,
+            C1_MENU:        reply_keyboard_handlers + common_handlers,
+            BOOK_MENU:      reply_keyboard_handlers + common_handlers,
+            LEKTION_PAGE:   reply_keyboard_handlers + common_handlers,
+            TRANSLATOR:     reply_keyboard_handlers + common_handlers,
+            QUIZ_STATE:     reply_keyboard_handlers + common_handlers,
+            POMODORO_STATE: reply_keyboard_handlers + common_handlers,
 
             # Tarjimon matn kiritish
-            UZB_DEU_INPUT: common_handlers + [
+            UZB_DEU_INPUT: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
             ],
-            DEU_UZB_INPUT: common_handlers + [
+            DEU_UZB_INPUT: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, translation_input_handler),
             ],
 
             # ===== AI MENTOR STATES =====
-            AI_MENTOR_MENU: common_handlers,
+            AI_MENTOR_MENU: reply_keyboard_handlers + common_handlers,
 
             # Level detection — matn VA ovoz
-            LEVEL_DETECT_Q1: common_handlers + [
+            LEVEL_DETECT_Q1: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
                 MessageHandler(voice_filter, level_detect_process),
             ],
-            LEVEL_DETECT_Q2: common_handlers + [
+            LEVEL_DETECT_Q2: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
                 MessageHandler(voice_filter, level_detect_process),
             ],
-            LEVEL_DETECT_Q3: common_handlers + [
+            LEVEL_DETECT_Q3: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
                 MessageHandler(voice_filter, level_detect_process),
             ],
-            LEVEL_DETECT_Q4: common_handlers + [
+            LEVEL_DETECT_Q4: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
                 MessageHandler(voice_filter, level_detect_process),
             ],
-            LEVEL_DETECT_Q5: common_handlers + [
+            LEVEL_DETECT_Q5: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, level_detect_process),
                 MessageHandler(voice_filter, level_detect_process),
             ],
-            LEVEL_DETECT_RESULT: common_handlers,
+            LEVEL_DETECT_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Vorstellen — matn VA ovoz
-            VORSTELLEN_START: common_handlers + [
+            VORSTELLEN_START: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
                 MessageHandler(voice_filter, vorstellen_process),
             ],
-            VORSTELLEN_FOLLOWUP: common_handlers + [
+            VORSTELLEN_FOLLOWUP: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
                 MessageHandler(voice_filter, vorstellen_process),
             ],
-            VORSTELLEN_RESULT: common_handlers,
+            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Erfahrungen — matn VA ovoz
-            ERFAHRUNGEN_MENU:       common_handlers,
-            ERFAHRUNGEN_TOPIC:      common_handlers,
-            ERFAHRUNGEN_DIFFICULTY: common_handlers,
-            ERFAHRUNGEN_CHAT: common_handlers + [
+            ERFAHRUNGEN_MENU:       reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_TOPIC:      reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_DIFFICULTY: reply_keyboard_handlers + common_handlers,
+            ERFAHRUNGEN_CHAT: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, erfahrungen_chat),
                 MessageHandler(voice_filter, erfahrungen_chat),
             ],
-            ERFAHRUNGEN_RESULT: common_handlers,
+            ERFAHRUNGEN_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Mistake bank
-            MISTAKE_BANK_MENU:  common_handlers,
-            MISTAKE_REVIEW:     common_handlers,
-            MISTAKE_MINILESSON: common_handlers,
-            MISTAKE_PRACTICE: common_handlers + [
+            MISTAKE_BANK_MENU:  reply_keyboard_handlers + common_handlers,
+            MISTAKE_REVIEW:     reply_keyboard_handlers + common_handlers,
+            MISTAKE_MINILESSON: reply_keyboard_handlers + common_handlers,
+            MISTAKE_PRACTICE: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, mistake_practice_process),
             ],
 
             # Voice vocab
-            VOICE_VOCAB_MENU:  common_handlers,
-            VOICE_VOCAB_LEVEL: common_handlers,
-            VOICE_VOCAB_TOPIC: common_handlers,
-            VOICE_VOCAB_WORDS: common_handlers,
-            VOICE_VOCAB_TEST: common_handlers + [
+            VOICE_VOCAB_MENU:  reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_LEVEL: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_TOPIC: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_WORDS: reply_keyboard_handlers + common_handlers,
+            VOICE_VOCAB_TEST: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vocab_test_process),
                 MessageHandler(voice_filter, vocab_test_process),
             ],
-            VOICE_VOCAB_SPRECHEN: common_handlers + [
+            VOICE_VOCAB_SPRECHEN: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(voice_filter, vocab_sprechen_process),
             ],
 
             # Roleplay — matn VA ovoz
-            ROLEPLAY_MENU:  common_handlers,
-            ROLEPLAY_LEVEL: common_handlers,
-            ROLEPLAY_TOPIC: common_handlers,
-            ROLEPLAY_RULES: common_handlers,
-            ROLEPLAY_CHAT: common_handlers + [
+            ROLEPLAY_MENU:  reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_LEVEL: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_TOPIC: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_RULES: reply_keyboard_handlers + common_handlers,
+            ROLEPLAY_CHAT: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, roleplay_chat),
                 MessageHandler(voice_filter, roleplay_chat),
             ],
-            ROLEPLAY_RESULT:    common_handlers,
-            AI_MENTOR_SETTINGS: common_handlers,
+            ROLEPLAY_RESULT:    reply_keyboard_handlers + common_handlers,
+            AI_MENTOR_SETTINGS: reply_keyboard_handlers + common_handlers,
         },
         fallbacks=[
             CommandHandler("start", start),
@@ -1471,9 +1519,9 @@ def main() -> None:
         filters.TEXT & filters.Regex("^🔍 Raqam izlash$"), admin_search_phone
     ))
 
-    # Admin qidiruv natijasi
+    # Admin qidiruv natijasi (faqat admin_search flag True bo'lganda ishlaydi)
     application.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND, admin_search_result
+        filters.TEXT & ~filters.COMMAND & filters.User(ADMIN_IDS), admin_search_result
     ), group=10)
 
     # Ovozli xabarlar fallback (ConversationHandler tashqarisida)
