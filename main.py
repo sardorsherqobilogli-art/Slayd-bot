@@ -534,13 +534,9 @@ async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 # Endi bu funksiya ConversationHandler ichidagi REG_CHANNEL state ga qo'shildi.
 
 async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Davom etish tugmasi — tekshiruvsiz o'tkazadi"""
     query = update.callback_query
-    user_id = query.from_user.id
-    is_member = await check_channel_membership(user_id, context)
-    if not is_member:
-        await query.answer("❌ Hali a'zo emassiz! Kanalga kiring.", show_alert=True)
-        return REG_CHANNEL
-    await query.answer("✅ Tekshirildi!")
+    await query.answer("✅ Xush kelibsiz!")
     db = get_db()
     user = db.get_or_create_user(user_id)
     db.generate_daily_missions(user_id)
