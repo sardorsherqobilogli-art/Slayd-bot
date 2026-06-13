@@ -497,6 +497,11 @@ async def reg_phone_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     return await _show_welcome(update, context, user, first_name)
 
 
+# ==================== TUZATISH: check_sub_handler ====================
+# Avvalgi versiyada bu handler ConversationHandler TASHQARISIDA edi,
+# shuning uchun REG_CHANNEL state da ishlamay xato berardi.
+# Endi bu funksiya ConversationHandler ichidagi REG_CHANNEL state ga qo'shildi.
+
 async def check_sub_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     query = update.callback_query
     await query.answer()
@@ -996,7 +1001,6 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
 
     try:
         import json
-        # JSON parse — ba'zan model ```json ... ``` qo'shadi, tozalaymiz
         clean = result.replace("```json", "").replace("```", "").strip()
         data = json.loads(clean)
         translation = data.get("translation", result)
@@ -1020,7 +1024,6 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
     if tips:
         text += f"💡 *Maslahat:* {esc_md(tips)}\n\n"
 
-    # Ovozda eshitish uchun so'zni saqlaymiz
     context.user_data["last_translation"] = translation
     context.user_data["last_translation_dir"] = direction
 
@@ -1038,14 +1041,10 @@ async def translation_input_handler(update: Update, context: ContextTypes.DEFAUL
 
 
 async def tts_translate_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Tarjimani ovozda tinglash"""
     query = update.callback_query
     await query.answer("🔊 Ovoz tayyorlanmoqda...")
-
-    # Oxirgi tarjimani olish
     translation = context.user_data.get("last_translation", "Hallo")
     direction = context.user_data.get("last_translation_dir", "uzb_deu")
-
     await speak_text(query, translation, voice="female", speed=0.9)
     return TRANSLATOR
 
@@ -1133,14 +1132,8 @@ async def reply_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ==================== OVOZLI XABAR — UNIVERSAL HANDLER ====================
 
 async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    ConversationHandler TASHQARIDAGI ovozli xabarlar uchun.
-    ConversationHandler ICHIDA ovoz to'g'ridan-to'g'ri
-    tegishli handler ga (level_detect_process, roleplay_chat, va h.k.) uzatiladi.
-    """
     user_id = update.effective_user.id
 
-    # Ovozni matnga o'girish
     loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
     text = await listen_to_voice(update)
     await loading.delete()
@@ -1152,7 +1145,6 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         )
         return
 
-    # Standart holat — AI Mentor bilan erkin suhbat
     db = get_db()
     user = db.get_or_create_user(user_id)
     level = user.get("current_level", "a1")
@@ -1178,7 +1170,6 @@ async def voice_message_handler(update: Update, context: ContextTypes.DEFAULT_TY
         ])
     )
 
-    # AI javobini ovozda yuborish
     await speak_text(update, ai_response, voice="female", speed=0.95)
 
 
@@ -1196,7 +1187,6 @@ def main() -> None:
     application = Application.builder().token(TOKEN).build()
 
     # ==================== COMMON HANDLERS ====================
-    # Bu handlerlar barcha ConversationHandler state larida ishlaydi
     common_handlers = [
         # Asosiy navigatsiya
         CallbackQueryHandler(main_menu_handler,    pattern=f"^{CB.MAIN_MENU}$"),
@@ -1304,25 +1294,36 @@ def main() -> None:
         CallbackQueryHandler(settings_mistakes,  pattern=f"^{CB.SETTINGS_MISTAKES}$"),
     ]
 
-    # ==================== OVOZLI XABAR HANDLERLARI (common ichida) ====================
-    # ConversationHandler ichida ovoz qabul qilinadigan state lar uchun
     voice_filter = filters.VOICE | filters.AUDIO
 
     # ==================== CONVERSATION HANDLER ====================
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            MAIN_MENU:    common_handlers,
-            LEVEL_SELECT: common_handlers,
-            A1_MENU:      common_handlers,
-            A2_MENU:      common_handlers,
-            B1_MENU:      common_handlers,
-            B2_MENU:      common_handlers,
-            C1_MENU:      common_handlers,
-            BOOK_MENU:    common_handlers,
-            LEKTION_PAGE: common_handlers,
-            TRANSLATOR:   common_handlers,
-            QUIZ_STATE:   common_handlers,
+            # ===== ONBOARDING STATES — TUZATISH ASOSIY JOYI =====
+            # Avval bu ikki handler ConversationHandler TASHQARISIDA edi,
+            # shuning uchun REG_CHANNEL state da "check_sub" bosilganda
+            # ConversationHandler uni tutib ololmas va xato berardi.
+            # Endi to'g'ri joyda — state ichida.
+            REG_PHONE: [
+                MessageHandler(filters.CONTACT, reg_phone_handler),
+            ],
+            REG_CHANNEL: [
+                CallbackQueryHandler(check_sub_handler, pattern="^check_sub$"),
+            ],
+
+            # ===== ASOSIY STATLAR =====
+            MAIN_MENU:      common_handlers,
+            LEVEL_SELECT:   common_handlers,
+            A1_MENU:        common_handlers,
+            A2_MENU:        common_handlers,
+            B1_MENU:        common_handlers,
+            B2_MENU:        common_handlers,
+            C1_MENU:        common_handlers,
+            BOOK_MENU:      common_handlers,
+            LEKTION_PAGE:   common_handlers,
+            TRANSLATOR:     common_handlers,
+            QUIZ_STATE:     common_handlers,
             POMODORO_STATE: common_handlers,
 
             # Tarjimon matn kiritish
@@ -1381,8 +1382,8 @@ def main() -> None:
             ERFAHRUNGEN_RESULT: common_handlers,
 
             # Mistake bank
-            MISTAKE_BANK_MENU: common_handlers,
-            MISTAKE_REVIEW:    common_handlers,
+            MISTAKE_BANK_MENU:  common_handlers,
+            MISTAKE_REVIEW:     common_handlers,
             MISTAKE_MINILESSON: common_handlers,
             MISTAKE_PRACTICE: common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, mistake_practice_process),
@@ -1410,7 +1411,7 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, roleplay_chat),
                 MessageHandler(voice_filter, roleplay_chat),
             ],
-            ROLEPLAY_RESULT: common_handlers,
+            ROLEPLAY_RESULT:    common_handlers,
             AI_MENTOR_SETTINGS: common_handlers,
         },
         fallbacks=[
@@ -1428,12 +1429,6 @@ def main() -> None:
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("admin", admin_panel))
-
-    # Onboarding — telefon raqami (ConversationHandler tashqarida)
-    application.add_handler(MessageHandler(filters.CONTACT, reg_phone_handler))
-
-    # Kanal obuna tekshirish
-    application.add_handler(CallbackQueryHandler(check_sub_handler, pattern="^check_sub$"))
 
     # Pastki ReplyKeyboard tugmalari
     application.add_handler(MessageHandler(
@@ -1468,7 +1463,7 @@ def main() -> None:
         filters.TEXT & ~filters.COMMAND, admin_search_result
     ), group=10)
 
-    # Ovozli xabarlar fallback
+    # Ovozli xabarlar fallback (ConversationHandler tashqarisida)
     application.add_handler(MessageHandler(voice_filter, voice_message_handler))
 
     print("🤖 ==========================================")
