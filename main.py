@@ -40,7 +40,7 @@ from ai_mentor import (
     AI_MENTOR_MENU,
     LEVEL_DETECT_Q1, LEVEL_DETECT_Q2, LEVEL_DETECT_Q3, LEVEL_DETECT_Q4, LEVEL_DETECT_Q5,
     LEVEL_DETECT_RESULT,
-    VORSTELLEN_START, VORSTELLEN_FOLLOWUP, VORSTELLEN_RESULT,
+    VORSTELLEN_MENU, VORSTELLEN_Q1, VORSTELLEN_RESULT,
     ERFAHRUNGEN_MENU, ERFAHRUNGEN_TOPIC, ERFAHRUNGEN_DIFFICULTY,
     ERFAHRUNGEN_CHAT, ERFAHRUNGEN_RESULT,
     MISTAKE_BANK_MENU, MISTAKE_REVIEW, MISTAKE_MINILESSON, MISTAKE_PRACTICE,
@@ -60,10 +60,10 @@ from ai_mentor import (
     ld_speak_handler,
 
     # Vorstellen
-    vorstellen_start,
-    vorstellen_process,
-    vs_show_section,
-    vs_speak_handler,
+    vorstellen_start_new as vorstellen_start,
+    vorstellen_process_new,
+    vs_show_section_new,
+    vs_speak_new,
 
     # Erfahrungen
     erfahrungen_menu,
@@ -80,9 +80,7 @@ from ai_mentor import (
     mistake_improve_handler,
     mistake_practice,
     mistake_practice_process,
-    mistake_master,
-    mistake_random,
-
+        
     # Voice vocab (yangi nomlar)
     voice_vocab_menu,
     voice_vocab_level_select,
@@ -106,6 +104,10 @@ from ai_mentor import (
     # Groq helper (tarjimon uchun)
     groq_chat,
 )
+
+
+# Alias
+voice_vocab_menu = voice_vocab_level_select
 
 # Progress moduli
 from progress import (
@@ -1297,10 +1299,10 @@ def main() -> None:
         CallbackQueryHandler(ld_speak_handler,     pattern=r"^ld_speak$"),
 
         # Vorstellen
-        CallbackQueryHandler(vorstellen_start,     pattern=f"^{CB.AI_VORSTELLEN}$"),
-        CallbackQueryHandler(vorstellen_process,   pattern=r"^vorstellen_"),
-        CallbackQueryHandler(vs_show_section,      pattern=r"^vs_show_(tushuntirish|tarjima|yaxshilash)$"),
-        CallbackQueryHandler(vs_speak_handler,     pattern=r"^vs_speak$"),
+        CallbackQueryHandler(vorstellen_start_new,     pattern=f"^{CB.AI_VORSTELLEN}$"),
+        CallbackQueryHandler(vorstellen_process_new,   pattern=r"^vorstellen_"),
+        CallbackQueryHandler(vs_show_section_new,      pattern=r"^vs_show_(tushuntirish|tarjima|yaxshilash)$"),
+        CallbackQueryHandler(vs_speak_new,     pattern=r"^vs_speak$"),
 
         # Erfahrungen
         CallbackQueryHandler(erfahrungen_menu,       pattern=f"^{CB.AI_ERFAHRUNGEN}$"),
