@@ -77,7 +77,6 @@ from ai_mentor import (
     mistake_list,
     mistake_master,
     mistake_random,
-    vorstellen_rate,
     mistake_mini_lesson,
     mistake_speak_handler,
     mistake_improve_handler,
@@ -1434,17 +1433,15 @@ def main() -> None:
             LEVEL_DETECT_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Vorstellen — matn VA ovoz
-            VORSTELLEN_MENU: reply_keyboard_handlers + common_handlers + [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
-                MessageHandler(voice_filter, vorstellen_process_new),
+            VORSTELLEN_START: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
+                MessageHandler(voice_filter, vorstellen_process),
             ],
-            VORSTELLEN_Q1: reply_keyboard_handlers + common_handlers + [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
-                MessageHandler(voice_filter, vorstellen_process_new),
+            VORSTELLEN_FOLLOWUP: reply_keyboard_handlers + common_handlers + [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
+                MessageHandler(voice_filter, vorstellen_process),
             ],
-            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers + [
-                CallbackQueryHandler(vorstellen_rate, pattern=r'^rate_[1-5]$'),
-            ],
+            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Erfahrungen — matn VA ovoz
             ERFAHRUNGEN_MENU:       common_handlers,
