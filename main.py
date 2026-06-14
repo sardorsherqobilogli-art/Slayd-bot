@@ -77,6 +77,7 @@ from ai_mentor import (
     mistake_list,
     mistake_master,
     mistake_random,
+    vorstellen_rate,
     mistake_mini_lesson,
     mistake_speak_handler,
     mistake_improve_handler,
@@ -1441,7 +1442,9 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
                 MessageHandler(voice_filter, vorstellen_process_new),
             ],
-            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers,
+            VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers + [
+                CallbackQueryHandler(vorstellen_rate, pattern=r'^rate_[1-5]$'),
+            ],
 
             # Erfahrungen — matn VA ovoz
             ERFAHRUNGEN_MENU:       common_handlers,

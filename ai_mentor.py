@@ -326,7 +326,7 @@ async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYP
             "Nemis tili o'qituvchisi. Foydalanuvchi javobini tahlil qil. "
             "JSON formatida qaytargin: {"
             '"tushuntirish": "xatolar va grammatika tushuntirish (o\'zbek tilida)",'
-            '"tarjima": "to\'g\'ri nemischa javob matni",'
+            '"tarjima": "togri nemischa javob matni",'
             '"yaxshilash": "yaxshilangan variant va maslahatlar",'
             '"is_correct": true_yoki_false,'
             '"level_hint": "A1 yoki A2 yoki B1 yoki B2 yoki C1"'
@@ -944,6 +944,236 @@ def create_vorstellen_natija_pdf(
     buffer.seek(0)
     return buffer.read()
 
+
+def _create_premium_natija_pdf(user_text, result, level, g_score, v_score, f_score, total) -> bytes:
+    """Premium natija PDF — 10+ bet, mukammal"""
+    NAVY   = colors.HexColor("#1a237e")
+    RED    = colors.HexColor("#c62828")
+    GOLD   = colors.HexColor("#e65100")
+    TEAL   = colors.HexColor("#00695c")
+    INDIGO = colors.HexColor("#283593")
+    WHITE  = colors.white
+    BLACK  = colors.HexColor("#1a1a1a")
+    GRAY   = colors.HexColor("#555")
+    LGRAY  = colors.HexColor("#f5f5f5")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm,
+        topMargin=1.3*cm, bottomMargin=1.3*cm,
+        onFirstPage=_draw_watermark, onLaterPages=_draw_watermark)
+
+    S = getSampleStyleSheet()
+    def ps(n, **kw): return ParagraphStyle(n, parent=S["Normal"], **kw)
+    W = 18*cm
+    el = []
+
+    def sec(txt, bg):
+        t = Table([[Paragraph(txt, ps("s"+str(hash(txt))[:6],
+            fontSize=11, textColor=WHITE, fontName="Helvetica-Bold", leading=14))]],
+            colWidths=[W])
+        t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),bg),
+            ("TOPPADDING",(0,0),(-1,-1),7),("BOTTOMPADDING",(0,0),(-1,-1),7),
+            ("LEFTPADDING",(0,0),(-1,-1),12)]))
+        return t
+
+    def box(txt, bg=None, border=None):
+        bg = bg or LGRAY
+        t = Table([[Paragraph(txt, ps("b"+str(hash(txt))[:6],
+            fontSize=9.5, textColor=BLACK, fontName="Helvetica", leading=14))]],
+            colWidths=[W])
+        style = [("BACKGROUND",(0,0),(-1,-1),bg),
+            ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),12)]
+        if border:
+            style.append(("BOX",(0,0),(-1,-1),1.2,border))
+        t.setStyle(TableStyle(style))
+        return t
+
+    # HEADER
+    ht = Table([[Paragraph("🎤  VORSTELLEN — Natija va Tahlil",
+        ps("ht", fontSize=19, textColor=WHITE, alignment=TA_CENTER,
+           fontName="Helvetica-Bold", leading=23))]],colWidths=[W])
+    ht.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),7)]))
+    el.append(ht)
+    st = Table([[Paragraph(
+        "Deutsch Meister Pro  •  TELC/Goethe  •  @Muminov_Abdullokh  •  t.me/sprechenmitspass",
+        ps("st", fontSize=9, textColor=colors.HexColor("#bbdefb"),
+           alignment=TA_CENTER, fontName="Helvetica"))]],colWidths=[W])
+    st.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),INDIGO),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
+    el.append(st)
+    el.append(Spacer(1,5*mm))
+
+    # BALL
+    stars_str = "⭐" * total + "☆" * (7-total)
+    bt = Table([[
+        Paragraph(f"{total}/7\n{stars_str}",
+            ps("sc", fontSize=24, textColor=NAVY, fontName="Helvetica-Bold",
+               alignment=TA_CENTER, leading=28)),
+        Table([
+            [Paragraph(f"Daraja: {level}",
+                ps("lv", fontSize=15, textColor=GOLD, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER))],
+            [Paragraph(f"📚 Grammatika:   {g_score}/10",
+                ps("g1", fontSize=10, textColor=BLACK, fontName="Helvetica-Bold", leading=16))],
+            [Paragraph(f"🗣️ Soz boyligi: {v_score}/10",
+                ps("g2", fontSize=10, textColor=BLACK, fontName="Helvetica-Bold", leading=16))],
+            [Paragraph(f"💬 Ravonlik:      {f_score}/10",
+                ps("g3", fontSize=10, textColor=BLACK, fontName="Helvetica-Bold", leading=16))],
+        ], colWidths=[10*cm]),
+    ]], colWidths=[6*cm, 12*cm])
+    bt.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#e8eaf6")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
+        ("LEFTPADDING",(0,0),(-1,-1),10),
+        ("BOX",(0,0),(-1,-1),1.5,NAVY)]))
+    el.append(bt)
+    el.append(Spacer(1,5*mm))
+
+    # FOYDALANUVCHI JAVOBI
+    el.append(sec("📝  Sizning javobingiz", NAVY))
+    el.append(box(user_text or "Javob topilmadi", LGRAY))
+    el.append(Spacer(1,4*mm))
+
+    # GRAMMATIK XATOLAR
+    errors = result.get("grammar_errors", [])
+    if errors:
+        el.append(sec("❌  Grammatik xatolar va togrilash", RED))
+        rows = [[
+            Paragraph("❌ Xato", ps("eh", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold")),
+            Paragraph("✅ To\'g\'ri", ps("ec", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold")),
+            Paragraph("📖 Izoh", ps("ei", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold")),
+        ]]
+        for e in errors[:12]:
+            rows.append([
+                Paragraph(e.get("xato",""), ps("ex"+str(hash(e.get("xato","")))[:4],
+                    fontSize=9, textColor=RED, fontName="Helvetica", leading=13)),
+                Paragraph(e.get("togri",""), ps("et"+str(hash(e.get("togri","")))[:4],
+                    fontSize=9, textColor=TEAL, fontName="Helvetica-Bold", leading=13)),
+                Paragraph(e.get("izoh",""), ps("ei2"+str(hash(e.get("izoh","")))[:4],
+                    fontSize=8.5, textColor=GRAY, fontName="Helvetica", leading=12)),
+            ])
+        et = Table(rows, colWidths=[5*cm, 5*cm, 8*cm])
+        et.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#ffebee")),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+            ("LEFTPADDING",(0,0),(-1,-1),8),
+            ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#ddd"))]))
+        el.append(et)
+        el.append(Spacer(1,4*mm))
+
+    # HAR SAVOL TAHLILI
+    savol_tahlil = result.get("savol_tahlil", [])
+    if savol_tahlil:
+        el.append(sec("🔍  Har bir savol boyicha tahlil", INDIGO))
+        SAVOL_NOMLAR = [
+            "Name und Alter", "Herkunft/Heimatland", "Wohnort",
+            "Familie", "Deutsch lernen", "Beruf/Studium", "Sprachen"
+        ]
+        for i, s_data in enumerate(savol_tahlil[:7]):
+            mavzu = s_data.get("mavzu", SAVOL_NOMLAR[i] if i < 7 else "")
+            javob = s_data.get("javob", "Javob yoq")
+            baho  = s_data.get("baho", 5)
+            xato  = s_data.get("xato", "")
+            yaxshi= s_data.get("yaxshi", "")
+            baho_bar = "▓" * baho + "░" * (10-baho)
+            row = Table([[
+                Paragraph(f"{i+1}. {mavzu}",
+                    ps(f"sq{i}", fontSize=10, textColor=WHITE, fontName="Helvetica-Bold")),
+                Paragraph(f"{baho}/10  {baho_bar}",
+                    ps(f"sb{i}", fontSize=9, textColor=WHITE, fontName="Helvetica",
+                       alignment=TA_CENTER)),
+            ]], colWidths=[12*cm, 6*cm])
+            row.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),TEAL if baho>=7 else GOLD if baho>=5 else RED),
+                ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+                ("LEFTPADDING",(0,0),(-1,-1),10),
+            ]))
+            el.append(row)
+            body_rows = []
+            body_rows.append([
+                Paragraph("💬 Javob:", ps(f"jl{i}", fontSize=9, textColor=GRAY, fontName="Helvetica-Bold")),
+                Paragraph(javob, ps(f"jv{i}", fontSize=9, textColor=BLACK, fontName="Helvetica", leading=13)),
+            ])
+            if xato:
+                body_rows.append([
+                    Paragraph("❌ Xato:", ps(f"xl{i}", fontSize=9, textColor=RED, fontName="Helvetica-Bold")),
+                    Paragraph(xato, ps(f"xv{i}", fontSize=9, textColor=RED, fontName="Helvetica", leading=13)),
+                ])
+            if yaxshi:
+                body_rows.append([
+                    Paragraph("✅ Yaxshi:", ps(f"yl{i}", fontSize=9, textColor=TEAL, fontName="Helvetica-Bold")),
+                    Paragraph(yaxshi, ps(f"yv{i}", fontSize=9, textColor=TEAL, fontName="Helvetica", leading=13)),
+                ])
+            bt2 = Table(body_rows, colWidths=[2.5*cm, 15.5*cm])
+            bt2.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,-1),LGRAY),
+                ("TOPPADDING",(0,0),(-1,-1),4),("BOTTOMPADDING",(0,0),(-1,-1),4),
+                ("LEFTPADDING",(0,0),(-1,-1),8),("VALIGN",(0,0),(-1,-1),"TOP"),
+            ]))
+            el.append(bt2)
+            el.append(Spacer(1,2*mm))
+        el.append(Spacer(1,3*mm))
+
+    # MUKAMMAL VARIANTLAR: A2, B1, B2
+    for lv, color, bg in [
+        ("A2", GOLD,  colors.HexColor("#fff8e1")),
+        ("B1", TEAL,  colors.HexColor("#e8f5e9")),
+        ("B2", NAVY,  colors.HexColor("#e8eaf6")),
+    ]:
+        javob   = result.get(f"{lv.lower()}_javob", "")
+        tarjima = result.get(f"{lv.lower()}_tarjima", "")
+        if not javob:
+            continue
+        el.append(sec(f"🏆  {lv} darajasida mukammal javob", color))
+        el.append(box(javob, bg, border=color))
+        if tarjima:
+            el.append(box(f"🇺🇿 Tarjima:\n{tarjima}", colors.HexColor("#fafafa")))
+        el.append(Spacer(1,4*mm))
+
+    # MASLAHATLAR
+    el.append(sec("💡  Maslahatlar", GOLD))
+    good = result.get("good_points", [])
+    maslahatlar = []
+    for g in good[:2]:
+        maslahatlar.append(f"✅ {g}")
+    maslahatlar += [
+        "Bu matnni yodlang va ovozda mashq qiling.",
+        "Har kuni 5 marta takrorlang - muscle memory hosil boladi.",
+        "Ovozingizni yozib, song tinglang va taqqoslang.",
+        "Imtihonda 30 soniya tayyorlanish - tez va aniq gapiring!",
+        "7 ta bolimni toliq yoritishga harakat qiling.",
+    ]
+    mt = Table([[Paragraph(f"• {m}", ps(f"ms{j}", fontSize=9.5, textColor=BLACK,
+        fontName="Helvetica", leading=14))] for j,m in enumerate(maslahatlar)],
+        colWidths=[W])
+    mt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#fff8e1")),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ("LEFTPADDING",(0,0),(-1,-1),14)]))
+    el.append(mt)
+    el.append(Spacer(1,5*mm))
+
+    # FOOTER
+    nt = Table([[Paragraph(
+        "📌 Mukammal variantni yodlang - keyingi safar yanada yaxshiroq!",
+        ps("nt", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold",
+           alignment=TA_CENTER, leading=13))]],colWidths=[W])
+    nt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),RED),
+        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
+    el.append(nt)
+    el.append(Spacer(1,3*mm))
+    el.append(Paragraph(
+        "t.me/sprechenmitspass  •  Deutsch Meister Pro  •  @Muminov_Abdullokh",
+        ps("ft", fontSize=8, textColor=GRAY, alignment=TA_CENTER, fontName="Helvetica")))
+
+    doc.build(el)
+    buffer.seek(0)
+    return buffer.read()
+
 # ==================== VORSTELLEN HANDLERS (YANGI) ====================
 
 async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1153,155 +1383,132 @@ async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_T
 
 
 async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """AI tahlil - yangi (7 savol + yulduz)"""
+    """AI tahlil — bitta javob, PDF chiqaradi, tugmalar yo'q"""
     v_data = context.user_data.get("vorstellen", {})
     answers = v_data.get("answers", [])
+    user_id = update.effective_user.id
 
-    # Oxirgi ovozli qismlarni birlashtirish
-    current_q = v_data.get("current_q", 1)
-    voice_parts = [v["text"] for v in v_data.get("voice_parts", []) if v["q_num"] == current_q]
-    if voice_parts:
-        full_text = " ".join(voice_parts)
-        v_data["answers"].append({
-            "q_num": current_q,
-            "text": full_text,
-            "voice": True,
-            "skipped": False
-        })
+    msg = update.message or (update.callback_query.message if update.callback_query else None)
 
-    # Qoldirilgan savollarni tekshirish
-    answered_nums = set(a["q_num"] for a in answers if a.get("text"))
-    missed = [i for i in range(1, 8) if i not in answered_nums]
-    score = len(answered_nums)
-
-    # AI tahlil
-    all_text = "\n".join([f"Savol {a['q_num']}: {a['text']}" for a in answers if a.get("text")])
-
-    loading = await (update.callback_query.edit_message_text if update.callback_query 
-                     else update.message.reply_text)(
-        "🧠 AI tahlil qilmoqda...\n\n"
-        "• Grammatik tekshirilmoqda\n"
+    # Loading xabari
+    loading = await msg.reply_text(
+        "🧠 AI tahlil qilmoqda...\n"
+        "• Grammatika tekshirilmoqda\n"
         "• So'z boyligi baholanmoqda\n"
-        "• Suvliklik tekshirilmoqda\n"
         "• Daraja aniqlanmoqda\n\n"
-        "Iltimos, kuting..."
+        "Iltimos, kuting... ⏳"
     )
 
+    # Foydalanuvchi javobini olish
+    user_text = " ".join([a["text"] for a in answers if a.get("text")]) if answers else ""
+
+    # AI ga yuboramiz — 7 savol bo'yicha alohida tahlil
     result = await groq_json([
         {"role": "system", "content": (
-            "Siz nemis tili o'qituvchisisiz. Foydalanuvchi 7 ta savolga javob berdi. "
-            "Har bir savolni tahlil qiling va JSON formatida qaytaring:\n"
+            "Siz TELC/Goethe nemis tili imtihon ekspertisiz. "
+            "Foydalanuvchi o'zini nemischa taqdim etdi (Vorstellen). "
+            "7 ta standart savol mavjud: "
+            "1-Name/Alter, 2-Herkunft, 3-Wohnort, 4-Familie, 5-Deutsch lernen, 6-Beruf/Studium, 7-Sprachen. "
+            "Foydalanuvchi javobini tahlil qilib JSON qaytar. "
+            "Qat'iy JSON format, boshqa hech narsa yo'q:\n"
             "{\n"
             '  "grammar_score": 1-10,\n'
             '  "vocabulary_score": 1-10,\n'
             '  "fluency_score": 1-10,\n'
-            '  "detected_level": "A1 yoki A2 yoki B1 yoki B2",\n'
-            '  "tushuntirish": "xatolar va grammatika tushuntirish uzbek tilida",\n'
-            '  "tarjima": "togri nemischa variant",\n'
-            '  "yaxshilash_a1": "A1 darajasida mukammal variant",\n'
-            '  "yaxshilash_a2": "A2 darajasida mukammal variant",\n'
-            '  "yaxshilash_b1": "B1 darajasida mukammal variant",\n'
-            '  "yaxshilash_b2": "B2 darajasida mukammal variant",\n'
-            '  "grammar_errors": [{"xato": "...", "togri": "..."}],\n'
-            '  "good_points": ["yaxshi jihatlar"]\n'
+            '  "detected_level": "A1|A2|B1|B2",\n'
+            '  "grammar_errors": [{"xato": "...", "togri": "...", "izoh": "uzbekcha izoh"}],\n'
+            '  "good_points": ["yaxshi jihat 1", "yaxshi jihat 2"],\n'
+            '  "savol_tahlil": [\n'
+            '    {"savol": 1, "mavzu": "Name und Alter", "javob": "foydalanuvchi javobi yoki yoq", "baho": 1-10, "xato": "...", "yaxshi": "..."},\n'
+            '    ...7 ta savol uchun...\n'
+            '  ],\n'
+            '  "a2_javob": "A2 darajasida 7 savolga toliq mukammal javob (nemischa)",\n'
+            '  "a2_tarjima": "a2_javob tarjimasi uzbekcha",\n'
+            '  "b1_javob": "B1 darajasida 7 savolga toliq mukammal javob (nemischa)",\n'
+            '  "b1_tarjima": "b1_javob tarjimasi uzbekcha",\n'
+            '  "b2_javob": "B2 darajasida 7 savolga toliq mukammal javob (nemischa)",\n'
+            '  "b2_tarjima": "b2_javob tarjimasi uzbekcha"\n'
             "}"
         )},
-        {"role": "user", "content": f"Javoblar:\n{all_text}\n\nQoldirilgan savollar: {missed}"}
-    ], max_tokens=2048)
+        {"role": "user", "content": f"Foydalanuvchi javobi:\n{user_text}"}
+    ], max_tokens=3000)
 
-    v_data["analysis"] = result
-    v_data["missed_questions"] = missed
+    await loading.delete()
 
-    # Yulduz baholash
-    stars = "⭐" * score + "☆" * (7 - score)
-    yulduz_text = VORSTELLEN_YULDUZ.get(score, VORSTELLEN_YULDUZ[0])
+    level   = result.get("detected_level", "A2")
+    g_score = result.get("grammar_score", 5)
+    v_score = result.get("vocabulary_score", 5)
+    f_score = result.get("fluency_score", 5)
+    total   = round((g_score + v_score + f_score) / 3 * 7 / 10)
 
-    # Daraja
-    level = result.get("detected_level", "A1")
-
-    # XP qo'shish
-    user_id = (update.callback_query.from_user.id if update.callback_query else update.effective_user.id)
+    # XP va xatolarni saqlash
     db = get_db()
-    db.add_xp(user_id, XP_REWARDS.get("vorstellen", 30) + score * 5, "vorstellen", f"Ball: {score}/7")
+    db.add_xp(user_id, XP_REWARDS.get("vorstellen", 30), "vorstellen", f"Daraja: {level}")
+    for err in result.get("grammar_errors", []):
+        if err.get("xato") and err.get("togri"):
+            db.add_mistake(user_id=user_id, user_input=err["xato"],
+                           correct_form=err["togri"], mistake_type="vorstellen_grammar")
 
-    # Xatolarni saqlash
-    for error in result.get("grammar_errors", []):
-        if error.get("xato") and error.get("togri"):
-            db.add_mistake(
-                user_id=user_id,
-                user_input=error["xato"],
-                correct_form=error["togri"],
-                mistake_type="vorstellen_grammar",
-            )
-
-    # Natija matni
-    text = (
-        f"🎤 Vorstellen Tahlili\n\n"
-        f"{stars}\n"
-        f"{yulduz_text}\n\n"
-        f"📊 Ball: {score}/7\n"
-        f"📚 Grammatika: {result.get('grammar_score', 5)}/10\n"
-        f"🗣️ Soz boyligi: {result.get('vocabulary_score', 5)}/10\n"
-        f"💬 Suvliklik: {result.get('fluency_score', 5)}/10\n\n"
-        f"🎯 Aniqlangan daraja: {level}\n\n"
-    )
-
-    # Qoldirilgan savollar
-    if missed:
-        text += f"⚠️ *Qoldirilgan savollar: {', '.join(map(str, missed))}*\n"
-        text += "❌ Bu ballingizga ta'sir qildi!\n\n"
-        # Qoldirilgan savollar uchun maslahat
-        text += "📌 *Maslahat:*\n"
-        for m in missed:
-            savol = VORSTELLEN_SAVOLLAR[m-1]
-            text += f"{m}. {esc_md(savol['mavzu'])} - {esc_md(savol['shablon_a2'][0])}\n"
-        text += "\n"
-
-    # Yaxshi jihatlar
-    good_points = result.get("good_points", [])
-    if good_points:
-        text += "✅ *Yaxshi jihatlar:*\n"
-        for point in good_points[:3]:
-            text += f"• {esc_md(point)}\n"
-        text += "\n"
-
-    text += "*Quyidagi bo'limlardan birini tanlang:*"
-
-    # Save for later use
-    context.user_data["vs_result"] = result
-    context.user_data["vs_score"] = score
-    context.user_data["vs_level"] = level
-
-    # Natija xabarini yuboramiz
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=vorstellen_result_keyboard())
-    else:
-        await update.message.reply_text(text, reply_markup=vorstellen_result_keyboard())
-
-    # Premium natija PDFni yuboramiz
+    # PDF yaratamiz
     try:
-        pdf_bytes = create_vorstellen_natija_pdf(
-            user_answers=answers,
+        pdf_bytes = _create_premium_natija_pdf(
+            user_text=user_text,
             result=result,
-            score=score,
             level=level,
-            missed=missed,
+            g_score=g_score,
+            v_score=v_score,
+            f_score=f_score,
+            total=total,
         )
-        msg = update.callback_query.message if update.callback_query else update.message
         await msg.reply_document(
             document=io.BytesIO(pdf_bytes),
             filename="Vorstellen_Natija.pdf",
             caption=(
-                "📄 *Sizning natijangiz PDF formatida!*\n\n"
-                "✅ Mukammal variantni yodlang\n"
-                "🎯 Har kuni mashq qiling — muvaffaqiyat kafolatlangan!"
+                f"📄 Natijangiz tayyor! Daraja: {level}\n\n"
+                f"📊 Umumiy: {total}/7\n"
+                f"📚 Grammatika: {g_score}/10\n"
+                f"🗣️ So'z boyligi: {v_score}/10\n"
+                f"💬 Ravonlik: {f_score}/10\n\n"
+                "✅ PDF ni saqlang va mukammal variantni yodlang!"
             ),
-            parse_mode="Markdown",
         )
     except Exception as e:
-        logger.error(f"Vorstellen natija PDF xatosi: {e}")
+        logger.error(f"Vorstellen PDF xatosi: {e}")
+        await msg.reply_text(
+            f"✅ Tahlil tugadi! Daraja: {level}\n"
+            f"Grammatika: {g_score}/10  So'z boyligi: {v_score}/10"
+        )
 
+    # Baholash tugmalari
+    await msg.reply_text(
+        "⭐ Botimizni baholang — bu bizga juda muhim!",
+        reply_markup=InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("⭐1", callback_data="rate_1"),
+                InlineKeyboardButton("⭐2", callback_data="rate_2"),
+                InlineKeyboardButton("⭐3", callback_data="rate_3"),
+                InlineKeyboardButton("⭐4", callback_data="rate_4"),
+                InlineKeyboardButton("⭐5", callback_data="rate_5"),
+            ],
+        ])
+    )
+
+    context.user_data["vorstellen"] = {}
     return VORSTELLEN_RESULT
+
+
+async def vorstellen_rate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Foydalanuvchi baho berdi"""
+    query = update.callback_query
+    await query.answer()
+    stars = int(query.data.split("_")[1])
+    msg = {1: "😔 Tushundik, yaxshilaymiz!", 2: "🙂 Rahmat, harakat qilamiz!",
+           3: "😊 Rahmat!", 4: "😃 Juda rahmat!", 5: "🤩 Zo'r! Katta rahmat!"}
+    await query.edit_message_text(
+        f"{'⭐' * stars} Bahoyingiz: {stars}/5\n\n{msg.get(stars, 'Rahmat!')}\n\n"
+        "🔁 Yana mashq qilish uchun /start"
+    )
+    return ConversationHandler.END
 
 
 async def vs_show_section_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -1940,7 +2147,7 @@ async def mistake_mini_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f'Xato: "{mistake["user_input"]}" To\'g\'ri: "{mistake["correct_form"]}" '
                 f'Turi: {mistake["mistake_type"]}\n'
                 'JSON: {"rule": "grammatik qoida", "explanation": "tushuntirish o\'zbek tilida", '
-                '"example_correct": "3 ta to\'g\'ri misol", "example_wrong": "3 ta noto\'g\'ri misol", '
+                '"example_correct": "3 ta togri misol", "example_wrong": "3 ta notogri misol", '
                 '"tip": "xotirada saqlash maslahat"}'
             )},
         ], max_tokens=1024)
