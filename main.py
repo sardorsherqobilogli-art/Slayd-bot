@@ -1299,7 +1299,7 @@ def main() -> None:
         CallbackQueryHandler(ld_speak_handler,     pattern=r"^ld_speak$"),
 
         # Vorstellen
-        CallbackQueryHandler(vorstellen_start_new,     pattern=f"^{CB.AI_VORSTELLEN}$"),
+        CallbackQueryHandler(vorstellen_start,         pattern=f"^{CB.AI_VORSTELLEN}$"),
         CallbackQueryHandler(vorstellen_process_new,   pattern=r"^vorstellen_"),
         CallbackQueryHandler(vs_show_section_new,      pattern=r"^vs_show_(tushuntirish|tarjima|yaxshilash)$"),
         CallbackQueryHandler(vs_speak_new,     pattern=r"^vs_speak$"),
