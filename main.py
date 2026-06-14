@@ -1433,7 +1433,7 @@ def main() -> None:
             LEVEL_DETECT_RESULT: reply_keyboard_handlers + common_handlers,
 
             # Vorstellen — matn VA ovoz
-            VORSTELLEN_START: reply_keyboard_handlers + common_handlers + [
+            VORSTELLEN_MENU: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
                 MessageHandler(voice_filter, vorstellen_process),
             ],
