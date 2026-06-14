@@ -75,6 +75,8 @@ from ai_mentor import (
     # Mistake bank
     mistake_bank_menu,
     mistake_list,
+    mistake_master,
+    mistake_random,
     mistake_mini_lesson,
     mistake_speak_handler,
     mistake_improve_handler,
