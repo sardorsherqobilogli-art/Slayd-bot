@@ -265,7 +265,6 @@ async def level_detect_start(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"*Savol 1/5:*\n{esc_md(question['question'])}\n\n"
         f"💡 Yordam uchun: `Yordam` deb yozing\n"
         f"📝 Yozma YOKI 🎙️ ovozli javob bering\\!",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="level_skip_0")],
             [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
@@ -293,7 +292,6 @@ async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYP
             await query.edit_message_text(
                 f"🎯 *Savol {q_idx + 1}/5*\n\n{esc_md(question['question'])}\n\n"
                 f"📝 Javobingizni yozing yoki 🎙️ ovoz yuboring:",
-                parse_mode="MarkdownV2",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"level_skip_{q_idx}")],
                 ])
@@ -303,7 +301,7 @@ async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYP
 
     # Ovozli javob
     if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*")
         user_text = await listen_to_voice(update)
         await loading.delete()
     elif update.message and update.message.text:
@@ -319,7 +317,6 @@ async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(
             f"🎯 *Savol {q_idx + 1}/5*\n\n{esc_md(question['question'])}\n\n"
             f"*Yordam:*\n{hints}\n\nEndi javobingizni yozing:",
-            parse_mode="MarkdownV2",
         )
         return LEVEL_DETECT_Q1 + min(q_idx, 4)
 
@@ -351,7 +348,6 @@ async def level_detect_process(update: Update, context: ContextTypes.DEFAULT_TYP
         f"{status}\n\n"
         f"🎯 *Sizning javobingiz:* _{esc_md(user_text)}_\n\n"
         f"Tahlilni tanlang:",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("💡 Tushuntirish", callback_data="ld_show_tushuntirish"),
@@ -387,7 +383,6 @@ async def ld_show_section(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await query.edit_message_text(
         f"{title}\n\n{esc_md(text)}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("💡 Tushuntirish", callback_data="ld_show_tushuntirish"),
@@ -452,9 +447,9 @@ async def _level_detect_show_result(obj, context: ContextTypes.DEFAULT_TYPE, via
     )
 
     if via_callback:
-        await obj.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
+        await obj.edit_message_text(text, reply_markup=ai_mentor_menu_keyboard())
     else:
-        await obj.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
+        await obj.message.reply_text(text, reply_markup=ai_mentor_menu_keyboard())
     return AI_MENTOR_MENU
 
 
@@ -1023,7 +1018,6 @@ async def vorstellen_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "• Daraja pasayadi\n"
         "• Natija yaxshi bo'lmaydi\n\n"
         "✅ *Maslahat:* Oldin shablonlarni ko'rib chiqing!",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📚 Shablonlarni ko'rish", callback_data="vorstellen_templates")],
             [InlineKeyboardButton("🎤 Boshlash", callback_data="vorstellen_start")],
@@ -1046,7 +1040,6 @@ async def vorstellen_templates(update: Update, context: ContextTypes.DEFAULT_TYP
         "🟡 *B1* - Murakkab, tushuntirishlar\n"
         "🟡 *B2* - Professional, mukammal\n\n"
         "*Darajangizni tanlang:*",
-        parse_mode="MarkdownV2",
         reply_markup=vorstellen_templates_keyboard()
     )
     return VORSTELLEN_START
@@ -1072,7 +1065,6 @@ async def vorstellen_template_show(update: Update, context: ContextTypes.DEFAULT
 
     await query.edit_message_text(
         text,
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🎤 Boshlash", callback_data="vorstellen_start")],
             [InlineKeyboardButton("↩️ Orqaga", callback_data="vorstellen_templates")],
@@ -1082,144 +1074,58 @@ async def vorstellen_template_show(update: Update, context: ContextTypes.DEFAULT
 
 
 async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen boshlash - 7 ta savol"""
+    """Vorstellen boshlash — foydalanuvchi javob kutiladi"""
     query = update.callback_query
     await query.answer()
 
-    # Reset user data
     context.user_data["vorstellen"] = {
         "answers": [],
-        "current_q": 1,
         "voice_parts": [],
         "analysis": None,
     }
 
-    savol = VORSTELLEN_SAVOLLAR[0]
-
     await query.edit_message_text(
-        f"🎤 Vorstellen - Savol {savol['id']}/7\n\n"
-        f"🇩🇪 {savol['nemis']}\n\n"
-        f"🇺🇿 {savol['uzbek']}\n\n"
-        f"📝 Javobingizni yozing YOKI\n"
-        f"🎙️ Ovozli xabar yuboring\n\n"
-        f"(3 martagacha ovoz yuborish mumkin)",
+        "🎤 Vorstellen boshlandi!\n\n"
+        "Endi o'zingizni nemischa taqdim eting:\n\n"
+        "• Ismingiz va yoshingiz\n"
+        "• Qayerdansiz\n"
+        "• Oilangiz\n"
+        "• Nima ish qilasiz\n"
+        "• Nemisni qayerda o'rgandingiz\n\n"
+        "✍️ Yozma matn YOKI 🎙️ ovozli xabar yuboring:",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_skip_1")],
-            [InlineKeyboardButton("🏠 Tugatish", callback_data="vorstellen_finish")],
+            [InlineKeyboardButton("❌ Bekor qilish", callback_data="ai_mentor_menu")],
         ])
     )
     return VORSTELLEN_START
 
 
 async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Savol javobini qayta ishlash - yangi"""
-    v_data = context.user_data.get("vorstellen", {})
-    current_q = v_data.get("current_q", 1)
+    """Foydalanuvchi javobi keldi — tahlilga o'tkazamiz"""
+    v_data = context.user_data.setdefault("vorstellen", {"answers": [], "voice_parts": []})
 
-    # Callback handling
     if update.callback_query:
-        query = update.callback_query
-        await query.answer()
+        await update.callback_query.answer()
+        if update.callback_query.data in ("ai_mentor_menu", "vorstellen_finish"):
+            return ConversationHandler.END
+        return VORSTELLEN_START
 
-        if query.data == "vorstellen_finish":
-            return await vorstellen_analyze_new(update, context)
-
-        if query.data.startswith("vorstellen_skip_"):
-            v_data["answers"].append({
-                "q_num": current_q,
-                "text": "",
-                "voice": False,
-                "skipped": True
-            })
-            return await _next_savol(update, context, current_q + 1)
-
-        if query.data.startswith("vorstellen_next_"):
-            return await _next_savol(update, context, current_q)
-
-    # Message handling
     if not update.message:
         return VORSTELLEN_START
 
     # Ovozli xabar
     if update.message.voice or update.message.audio:
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
-
+        loading = await update.message.reply_text("🎙️ Ovoz tahlil qilinmoqda...")
         user_text = await listen_to_voice(update)
         await loading.delete()
-
-        v_data["voice_parts"].append({
-            "q_num": current_q,
-            "text": user_text
-        })
-
-        voice_count = len([v for v in v_data.get("voice_parts", []) if v["q_num"] == current_q])
-        if voice_count < 3:
-            await update.message.reply_text(
-                f"✅ Ovoz qabul qilindi!\n\n"
-                f"{user_text[:100]}...\n\n"
-                f"Yana ovoz yuborishni xohlaysizmi?\n"
-                f"(Yana {3 - voice_count} ta imkoniyat)",
-                reply_markup=vorstellen_continue_keyboard(current_q)
-            )
-            return VORSTELLEN_START
-        else:
-            return await _next_savol(update, context, current_q + 1)
+        v_data["answers"].append({"q_num": 1, "text": user_text, "voice": True, "skipped": False})
+        return await vorstellen_analyze_new(update, context)
 
     # Matnli xabar
     elif update.message.text:
         user_text = update.message.text.strip()
-
-        v_data["answers"].append({
-            "q_num": current_q,
-            "text": user_text,
-            "voice": False,
-            "skipped": False
-        })
-
-        return await _next_savol(update, context, current_q + 1)
-
-    return VORSTELLEN_START
-
-
-async def _next_savol(update, context, next_q_num):
-    """Keyingi savolga o'tish"""
-    v_data = context.user_data.get("vorstellen", {})
-
-    if next_q_num > 7:
+        v_data["answers"].append({"q_num": 1, "text": user_text, "voice": False, "skipped": False})
         return await vorstellen_analyze_new(update, context)
-
-    v_data["current_q"] = next_q_num
-    savol = VORSTELLEN_SAVOLLAR[next_q_num - 1]
-
-    # Ovozli qismlarni birlashtirish
-    voice_parts = [v["text"] for v in v_data.get("voice_parts", []) if v["q_num"] == next_q_num - 1]
-    if voice_parts:
-        full_text = " ".join(voice_parts)
-        v_data["answers"].append({
-            "q_num": next_q_num - 1,
-            "text": full_text,
-            "voice": True,
-            "skipped": False
-        })
-        v_data["voice_parts"] = [v for v in v_data.get("voice_parts", []) if v["q_num"] != next_q_num - 1]
-
-    text = (
-        f"🎤 Savol {savol['id']}/7\n\n"
-        f"🇩🇪 {savol['nemis']}\n\n"
-        f"🇺🇿 {savol['uzbek']}\n\n"
-        f"📝 Javobingizni yozing YOKI\n"
-        f"🎙️ Ovozli xabar yuboring"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"vorstellen_skip_{next_q_num}")],
-        [InlineKeyboardButton("🏠 Tugatish", callback_data="vorstellen_finish")],
-    ])
-
-    if update.callback_query:
-        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
-    else:
-        await update.message.reply_text(text, reply_markup=keyboard)
 
     return VORSTELLEN_START
 
@@ -1251,13 +1157,12 @@ async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_T
 
     loading = await (update.callback_query.edit_message_text if update.callback_query 
                      else update.message.reply_text)(
-        "🧠 *AI tahlil qilmoqda...*\n\n"
+        "🧠 AI tahlil qilmoqda...\n\n"
         "• Grammatik tekshirilmoqda\n"
         "• So'z boyligi baholanmoqda\n"
         "• Suvliklik tekshirilmoqda\n"
         "• Daraja aniqlanmoqda\n\n"
-        "_Iltimos, kuting..._",
-        parse_mode="MarkdownV2"
+        "Iltimos, kuting..."
     )
 
     result = await groq_json([
@@ -1398,7 +1303,6 @@ async def vs_show_section_new(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     await query.edit_message_text(
         f"{title}\n\n{esc_md(text)}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("💡 Tushuntirish", callback_data="vs_show_tushuntirish"),
@@ -1430,7 +1334,6 @@ async def vs_improve_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"🟡 *B1* - Murakkab\n"
         f"🟡 *B2* - Professional\n\n"
         f"*Tanlang:*",
-        parse_mode="MarkdownV2",
         reply_markup=vorstellen_level_keyboard()
     )
     return VORSTELLEN_RESULT
@@ -1471,7 +1374,6 @@ async def vs_improve_show(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         f"{esc_md(improved_text)}\n\n"
         f"💡 *Maslahat:* Bu matnni yodlang!\n"
         f"📄 PDF shaklda yuklab olishingiz mumkin.",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📄 PDF yuklash", callback_data="vorstellen_pdf")],
             [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
@@ -1719,8 +1621,7 @@ async def vorstellen_pdf_new(update: Update, context: ContextTypes.DEFAULT_TYPE)
             filename=f"Vorstellen_{level}_{user_id}.pdf",
             caption=f"✅ *Vorstellen \\- {level} darajasida mukammal PDF*\n\n"
                     f"📄 Yuklab oling va yodlang\\!\n"
-                    f"@Muminov\\_Abdullokh \\| t\\.me/sprechenmitspass",
-            parse_mode="MarkdownV2"
+                    f"@Muminov\\_Abdullokh \\| t\\.me/sprechenmitspass"
         )
 
     except ImportError:
@@ -1753,7 +1654,6 @@ async def erfahrungen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
             f"💬 *Erfahrungen* faqat *B2 va C1* darajalarida mavjud\\!\n\n"
             f"Sizning darajangiz: {esc_md(LEVEL_LABELS.get(level, level))}\n\n"
             f"Avval darajangizni oshiring\\! 📚",
-            parse_mode="MarkdownV2",
             reply_markup=ai_mentor_menu_keyboard(),
         )
         return AI_MENTOR_MENU
@@ -1768,7 +1668,6 @@ async def erfahrungen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "*10 ta mavzu, 3 ta qiyinlik darajasi*\n\n"
         "🟢 Oddiy | 🟡 O'rta | 🔴 Qiyin\n\n"
         "Mavzu tanlang:",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup(rows),
     )
     return ERFAHRUNGEN_MENU
@@ -1789,7 +1688,6 @@ async def erfahrungen_topic(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         f"🟢 *Oddiy:* {esc_md(topic.get('easy', ''))}\n\n"
         f"🟡 *O'rta:* {esc_md(topic.get('medium', ''))}\n\n"
         f"🔴 *Qiyin:* {esc_md(topic.get('hard', ''))}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("🟢 Oddiy", callback_data=f"erf_diff_{topic_key}_easy"),
@@ -1840,7 +1738,6 @@ async def erfahrungen_start_chat(update: Update, context: ContextTypes.DEFAULT_T
         f"📝 *Savol:*\n{esc_md(question)}\n\n"
         f"{esc_md(ai_response)}\n\n"
         f"*Javobingizni yozing yoki ovoz yuboring\\!*",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
         ])
@@ -1857,7 +1754,7 @@ async def erfahrungen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     # Ovozli yoki matnli
     if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*")
         user_message = await listen_to_voice(update)
         await loading.delete()
     elif update.message and update.message.text:
@@ -1882,7 +1779,6 @@ async def erfahrungen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     await update.message.reply_text(
         f"{esc_md(ai_response)}\n\n*\\({turns}/5\\)* \\-\\> Javobingizni yozing:",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="erf_finish")],
         ])
@@ -1897,7 +1793,7 @@ async def erfahrungen_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await (update.callback_query.edit_message_text if update.callback_query
            else update.message.reply_text)(
-        "🧠 *AI yakuniy tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2"
+        "🧠 *AI yakuniy tahlil qilmoqda\\.\\.\\.*"
     )
 
     result = await groq_json(messages + [{
@@ -1931,9 +1827,9 @@ async def erfahrungen_result(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
+        await update.callback_query.edit_message_text(text, reply_markup=ai_mentor_menu_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard())
+        await update.message.reply_text(text, reply_markup=ai_mentor_menu_keyboard())
     return AI_MENTOR_MENU
 
 
@@ -1965,7 +1861,7 @@ async def mistake_bank_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         text += "Ajoyib\\! Sizda faol xatolar yo'q\\! 🎉"
         keyboard = ai_mentor_menu_keyboard()
 
-    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    await query.edit_message_text(text, reply_markup=keyboard)
     return MISTAKE_BANK_MENU
 
 
@@ -1980,7 +1876,6 @@ async def mistake_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     if not mistakes:
         await query.edit_message_text(
             "✅ *Barcha xatolar o'zlashtirilgan\\!*\n\nAjoyib ish\\! 🎉",
-            parse_mode="MarkdownV2",
             reply_markup=ai_mentor_menu_keyboard(),
         )
         return AI_MENTOR_MENU
@@ -1996,7 +1891,7 @@ async def mistake_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         )])
 
     keyboard_rows.append([InlineKeyboardButton("↩️ Xato bankiga qaytish", callback_data="ai_mistake_bank")])
-    await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=InlineKeyboardMarkup(keyboard_rows))
+    await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard_rows))
     return MISTAKE_BANK_MENU
 
 
@@ -2042,7 +1937,6 @@ async def mistake_mini_lesson(update: Update, context: ContextTypes.DEFAULT_TYPE
         f"✅ *To'g'ri: {esc_md(mistake['correct_form'])}*\n"
         f"📌 *Turi: {esc_md(mistake['mistake_type'])}*\n\n"
         f"{lesson_text}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake_id}")],
             [InlineKeyboardButton("✏️ Mashqlarni bajarish", callback_data=f"mistake_practice_{mistake_id}")],
@@ -2101,7 +1995,6 @@ async def mistake_improve_handler(update: Update, context: ContextTypes.DEFAULT_
         f"📝 *Tafsilot:*\n{esc_md(result.get('tafsilot', ''))}\n\n"
         f"🔁 *Sinonimlar:* {esc_md(sinonimlar)}\n\n"
         f"📌 *Misollar:*\n{misollar}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake_id}")],
             [InlineKeyboardButton("✅ O'zlashtirdim", callback_data=f"mistake_master_{mistake_id}")],
@@ -2143,7 +2036,6 @@ async def mistake_practice(update: Update, context: ContextTypes.DEFAULT_TYPE) -
     ex = exercises[0]
     await query.edit_message_text(
         f"✏️ *Mashq 1/{len(exercises)}*\n\n{esc_md(ex['task'])}\n\nJavobingizni yozing:",
-        parse_mode="MarkdownV2",
     )
     return MISTAKE_PRACTICE
 
@@ -2162,11 +2054,10 @@ async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT
 
     if is_correct:
         ex_data["correct"] += 1
-        await update.message.reply_text(f"✅ *To'g'ri\\!* `{esc_md(correct_answer)}`", parse_mode="MarkdownV2")
+        await update.message.reply_text(f"✅ *To'g'ri\\!* `{esc_md(correct_answer)}`")
     else:
         await update.message.reply_text(
-            f"❌ *Noto'g'ri*\nSiz: `{esc_md(user_answer)}`\nTo'g'ri: `{esc_md(correct_answer)}`",
-            parse_mode="MarkdownV2"
+            f"❌ *Noto'g'ri*\nSiz: `{esc_md(user_answer)}`\nTo'g'ri: `{esc_md(correct_answer)}`"
         )
 
     current += 1
@@ -2185,13 +2076,11 @@ async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT
             db.master_mistake(mistake_id)
             await update.message.reply_text(
                 f"🎉 *Barcha mashqlar bajarildi\\!* {correct_count}/{total}\n\n"
-                f"✅ Bu xato o'zlashtirildi\\!\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*",
-                parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
+                f"✅ Bu xato o'zlashtirildi\\!\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*", reply_markup=ai_mentor_menu_keyboard(),
             )
         else:
             await update.message.reply_text(
                 f"📊 *Natija: {correct_count}/{total}*\n\nYana mashq qilishingiz mumkin\\!",
-                parse_mode="MarkdownV2",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔁 Qayta mashq", callback_data=f"mistake_practice_{mistake_id}")],
                     [InlineKeyboardButton("🏠 AI Mentor", callback_data="ai_mentor_menu")],
@@ -2202,7 +2091,6 @@ async def mistake_practice_process(update: Update, context: ContextTypes.DEFAULT
     ex = exercises[current]
     await update.message.reply_text(
         f"✏️ *Mashq {current + 1}/{len(exercises)}*\n\n{esc_md(ex['task'])}\n\nJavobingizni yozing:",
-        parse_mode="MarkdownV2",
     )
     return MISTAKE_PRACTICE
 
@@ -2217,8 +2105,7 @@ async def mistake_master(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     db.add_xp(query.from_user.id, XP_REWARDS.get("mistake_corrected", 5), "mistake_mastered")
 
     await query.edit_message_text(
-        f"✅ *Xato o'zlashtirildi\\!* 🎉\n\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*",
-        parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
+        f"✅ *Xato o'zlashtirildi\\!* 🎉\n\n🎁 *+{XP_REWARDS.get('mistake_corrected', 5)} XP*", reply_markup=ai_mentor_menu_keyboard(),
     )
     return AI_MENTOR_MENU
 
@@ -2233,8 +2120,7 @@ async def mistake_random(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     if not mistakes:
         await query.edit_message_text(
-            "✅ *Barcha xatolar o'zlashtirilgan\\!*\n\nAjoyib ish\\! 🎉",
-            parse_mode="MarkdownV2", reply_markup=ai_mentor_menu_keyboard(),
+            "✅ *Barcha xatolar o'zlashtirilgan\\!*\n\nAjoyib ish\\! 🎉", reply_markup=ai_mentor_menu_keyboard(),
         )
         return AI_MENTOR_MENU
 
@@ -2257,7 +2143,6 @@ async def mistake_random(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"📚 *Qoida:*\n{esc_md(result.get('rule', 'N/A'))}\n\n"
         f"📝 *Tushuntirish:*\n{esc_md(result.get('explanation', 'N/A'))}\n\n"
         f"💡 *Maslahat:*\n{esc_md(result.get('tip', 'N/A'))}",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data=f"mistake_speak_{mistake['id']}")],
             [InlineKeyboardButton("✏️ Mashq qilish", callback_data=f"mistake_practice_{mistake['id']}")],
@@ -2281,7 +2166,6 @@ async def voice_vocab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         "AI 25 ta so'z generatsiya qiladi\\.\n"
         "Test, Sprechen va Rolli o'yin imkoniyatlari\\!\n\n"
         "*Darajangizni tanlang:*",
-        parse_mode="MarkdownV2",
         reply_markup=level_select_keyboard("vocab_level"),
     )
     return VOICE_VOCAB_LEVEL
@@ -2299,7 +2183,6 @@ async def voice_vocab_level_select(update: Update, context: ContextTypes.DEFAULT
     await query.edit_message_text(
         f"📚 *Ovozli Lug'at — {level.upper()}*\n\n"
         f"*Mavzu tanlang \\({len(topics)} ta mavzu\\):*",
-        parse_mode="MarkdownV2",
         reply_markup=topics_keyboard(topics, f"vocab_topic_{level}"),
     )
     return VOICE_VOCAB_TOPIC
@@ -2325,7 +2208,6 @@ async def voice_vocab_topic_select(update: Update, context: ContextTypes.DEFAULT
 
     await query.edit_message_text(
         f"📚 *{esc_md(topic)}*\n\n⏳ *AI 25 ta so'z tayyorlamoqda\\.\\.\\.*",
-        parse_mode="MarkdownV2",
     )
 
     # AI dan 25 so'z
@@ -2356,13 +2238,12 @@ async def voice_vocab_topic_select(update: Update, context: ContextTypes.DEFAULT
 
         # Telegram 4096 belgi chegarasi — bo'laklash
         if len(text) > 3500 and i < 25:
-            await query.message.reply_text(text, parse_mode="MarkdownV2")
+            await query.message.reply_text(text)
             text = ""
 
     if text:
         await query.message.reply_text(
             text if text else f"📚 *{esc_md(topic)}*",
-            parse_mode="MarkdownV2",
             reply_markup=InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("✏️ Test qilish", callback_data="vocab_test_start"),
@@ -2410,7 +2291,6 @@ async def vocab_test_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         f"🧠 *Test 1/{len(words)}*\n\n"
         f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
         f"_\\(Yozma yoki 🎙️ ovozli javob bering\\)_",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
@@ -2440,7 +2320,6 @@ async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 f"🧠 *Test {current + 1}/{len(words)}*\n\n"
                 f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
                 f"_\\(Yozma yoki 🎙️ ovozli\\)_",
-                parse_mode="MarkdownV2",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
                     [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
@@ -2450,7 +2329,7 @@ async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     # Matn yoki ovoz
     if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+        loading = await update.message.reply_text("🎙️ *Tahlil qilinmoqda...*")
         user_answer = await listen_to_voice(update)
         await loading.delete()
     elif update.message and update.message.text:
@@ -2475,15 +2354,13 @@ async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
         db.add_xp(update.effective_user.id, XP_REWARDS.get("vocab_test_correct", 5),
                   "vocab_test", words[current].get("german", ""))
         await update.message.reply_text(
-            f"✅ *To'g'ri\\!* `{esc_md(words[current].get('german', ''))}` \\+5 XP",
-            parse_mode="MarkdownV2"
+            f"✅ *To'g'ri\\!* `{esc_md(words[current].get('german', ''))}` \\+5 XP"
         )
     else:
         await update.message.reply_text(
             f"❌ *Noto'g'ri*\n"
             f"Siz: `{esc_md(user_answer)}`\n"
-            f"To'g'ri: `{esc_md(words[current].get('german', ''))}`",
-            parse_mode="MarkdownV2"
+            f"To'g'ri: `{esc_md(words[current].get('german', ''))}`"
         )
 
     current += 1
@@ -2497,7 +2374,6 @@ async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"✅ *To'g'ri: {correct_count}/{total}*\n"
             f"⭐ *Ball: {int(correct_count/total*10)}/10*\n\n"
             f"🎁 *+{correct_count * XP_REWARDS.get('vocab_test_correct', 5)} XP*",
-            parse_mode="MarkdownV2",
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔁 Qayta test", callback_data="vocab_test_start")],
                 [InlineKeyboardButton("🎤 Sprechen", callback_data="vocab_sprechen")],
@@ -2511,7 +2387,6 @@ async def vocab_test_process(update: Update, context: ContextTypes.DEFAULT_TYPE)
         f"🧠 *Test {current + 1}/{len(words)}*\n\n"
         f"🇺🇿 *{esc_md(w.get('uzbek', ''))}* — Nemischasi nima?\n\n"
         f"_\\(Yozma yoki 🎙️ ovozli\\)_",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vocab_skip")],
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="vocab_test_finish")],
@@ -2526,7 +2401,6 @@ async def _vocab_test_result(query, context) -> int:
     total = len(test_data.get("words", [1]))
     await query.edit_message_text(
         f"🏁 *Test tugadi\\!*\n\n✅ *To'g'ri: {correct}/{total}*",
-        parse_mode="MarkdownV2",
         reply_markup=ai_mentor_menu_keyboard(),
     )
     return VOICE_VOCAB_WORDS
@@ -2546,7 +2420,6 @@ async def vocab_sprechen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await query.edit_message_text(
         f"🎤 *Sprechen — {esc_md(topic)}*\n\n⏳ *Hikoya tayyorlanmoqda\\.\\.\\.*",
-        parse_mode="MarkdownV2",
     )
 
     word_list = ", ".join([w.get("german", "") for w in words[:25]])
@@ -2568,7 +2441,6 @@ async def vocab_sprechen(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         f"🎤 *Sprechen — {esc_md(topic)}*\n\n"
         f"*Hikoya \\(1 daqiqa\\):*\n\n{esc_md(story)}\n\n"
         f"_O'qib yodlang, keyin ovozda aytib bering\\!_",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vocab_speak_story")],
             [InlineKeyboardButton("🎙️ O'zim aytib beraman", callback_data="vocab_sprechen_ready")],
@@ -2600,7 +2472,6 @@ async def vocab_sprechen_ready(update: Update, context: ContextTypes.DEFAULT_TYP
         "🎙️ *Endi siz aytib bering\\!*\n\n"
         "Hikoyani ovozli xabar sifatida yuboring\\.\n"
         "_Kamera o'chirilmaydi, faqat ovoz yuboring\\._",
-        parse_mode="MarkdownV2",
     )
     return VOICE_VOCAB_SPRECHEN
 
@@ -2614,7 +2485,7 @@ async def vocab_sprechen_process(update: Update, context: ContextTypes.DEFAULT_T
         await update.message.reply_text("🎙️ Iltimos, ovozli xabar yuboring!")
         return VOICE_VOCAB_SPRECHEN
 
-    loading = await update.message.reply_text("🧠 *Tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+    loading = await update.message.reply_text("🧠 *Tahlil qilinmoqda...*")
     user_text = await listen_to_voice(update)
     await loading.delete()
 
@@ -2642,7 +2513,6 @@ async def vocab_sprechen_process(update: Update, context: ContextTypes.DEFAULT_T
         f"💡 *Yaxshilash:* {esc_md(result.get('improve', ''))}\n\n"
         f"📝 *Tahlil:* {esc_md(result.get('feedback', ''))}\n\n"
         f"🎁 *+{XP_REWARDS.get('vocab_sprechen', 30)} XP*",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("🔁 Qayta urinish", callback_data="vocab_sprechen")],
             [InlineKeyboardButton("🎭 Rolli o'yin", callback_data="vocab_roleplay")],
@@ -2681,7 +2551,6 @@ async def roleplay_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         "TELC / Goethe / ÖSD imtihoniga tayyorgarlik\\!\n\n"
         "Biz ikkovimiz birgalikda bir narsani rejalashtiramiz \\(gemeinsam etwas planen\\)\\.\n\n"
         "*Darajangizni tanlang:*",
-        parse_mode="MarkdownV2",
         reply_markup=level_select_keyboard("rp_level"),
     )
     return ROLEPLAY_LEVEL
@@ -2699,7 +2568,6 @@ async def roleplay_level_select(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text(
         f"🎭 *Rolli O'yin — {level.upper()}*\n\n"
         f"*Mavzu tanlang \\({len(topics)} ta mavzu\\):*",
-        parse_mode="MarkdownV2",
         reply_markup=topics_keyboard(topics, f"rp_topic_{level}"),
     )
     return ROLEPLAY_TOPIC
@@ -2755,7 +2623,6 @@ async def _roleplay_show_rules(query, context, level: str, topic: str) -> int:
         f"{punkt_text}\n\n"
         f"⏱ Vaqt: \\~2 daqiqa\n\n"
         f"Tayyor bo'lsangiz bosing 👇",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("▶️ Boshlash", callback_data="rp_start_dialog")],
             [InlineKeyboardButton("↩️ Mavzularga qaytish", callback_data=f"rp_level_{context.user_data.get('rp_level', 'a1')}")],
@@ -2815,7 +2682,6 @@ async def roleplay_start_dialog(update: Update, context: ContextTypes.DEFAULT_TY
         f"🎭 *{esc_md(topic)}*\n\n"
         f"🤖 *AI:* {esc_md(ai_start)}\n\n"
         f"*Javobingizni yozing yoki 🎙️ ovoz yuboring\\!*",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="rp_finish")],
         ])
@@ -2837,7 +2703,7 @@ async def roleplay_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
     # Ovozli yoki matnli
     if update.message and (update.message.voice or update.message.audio):
-        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*", parse_mode="MarkdownV2")
+        loading = await update.message.reply_text("🎙️ *Ovoz tahlil qilinmoqda...*")
         user_msg = await listen_to_voice(update)
         await loading.delete()
     elif update.message and update.message.text:
@@ -2876,7 +2742,6 @@ async def roleplay_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
     await update.message.reply_text(
         f"🤖 *AI:* {esc_md(ai_response)}\n\n"
         f"*\\({turns}/7\\)* \\-\\> Javobingizni yozing:",
-        parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏹️ Tugatish", callback_data="rp_finish")],
         ])
@@ -2895,7 +2760,7 @@ async def roleplay_result(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     await (update.callback_query.edit_message_text if update.callback_query
            else update.message.reply_text)(
-        "🧠 *AI tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2"
+        "🧠 *AI tahlil qilmoqda\\.\\.\\.*"
     )
 
     analysis = await groq_json([
@@ -2941,9 +2806,9 @@ async def roleplay_result(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     ])
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+        await update.message.reply_text(text, reply_markup=keyboard)
 
     return AI_MENTOR_MENU
 
@@ -2965,7 +2830,6 @@ async def ai_mentor_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         "📚 *Ovozli lug'at* \\- A1/A2/B1/B2, 20 mavzu, 25 so'z\n"
         "🎭 *Rolli o'yinlar* \\- TELC/Goethe uslubi, 20 mavzu\n\n"
         "Bo'limni tanlang:",
-        parse_mode="MarkdownV2",
         reply_markup=ai_mentor_menu_keyboard(),
     )
     return AI_MENTOR_MENU
