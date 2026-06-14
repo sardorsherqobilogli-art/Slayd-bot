@@ -947,54 +947,76 @@ def create_vorstellen_natija_pdf(
 # ==================== VORSTELLEN HANDLERS (YANGI) ====================
 
 async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen asosiy menyusi — rasm + PDF yuboradi"""
+    """Vorstellen — rasm yuboradi, Boshlash tugmasi"""
     query = update.callback_query
     await query.answer()
 
-    # Avval xabarni o'chiramiz
-    await query.edit_message_text(
-        "🎤 Vorstellen tayyorlanmoqda...",
+    # Eski xabarni o'chiramiz
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
+        [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
+    ])
+
+    caption = (
+        "🎤 VORSTELLEN — O'zingizni taqdim etish\n\n"
+        "📋 7 ta savol mavjud\n"
+        "Barcha bo'limlarni yoritishga harakat qiling\n\n"
+        "⏱ Sizga 10 daqiqa vaqt berildi!\n\n"
+        "Tayyorlanib bo'lgach Boshlash tugmasini bosing 👇"
     )
 
-    chat_id = query.message.chat_id
+    # Usul 1: file_id bilan (tez, serverda saqlangan bo'lsa)
+    saved_file_id = context.bot_data.get("vorstellen_card_file_id")
+    if saved_file_id:
+        try:
+            await query.message.reply_photo(
+                photo=saved_file_id,
+                caption=caption,
+                reply_markup=keyboard,
+            )
+            return VORSTELLEN_START
+        except Exception:
+            context.bot_data.pop("vorstellen_card_file_id", None)
 
-    # Tayyorlov rasmini yuboramiz
+    # Usul 2: URL orqali (GitHub raw)
+    card_url = "https://raw.githubusercontent.com/sardorsherqobilogli-art/Slayd-bot/main/vorstellen_card.jpg"
+    try:
+        sent = await query.message.reply_photo(
+            photo=card_url,
+            caption=caption,
+            reply_markup=keyboard,
+        )
+        # file_id ni saqlaymiz keyingi safar uchun
+        if sent.photo:
+            context.bot_data["vorstellen_card_file_id"] = sent.photo[-1].file_id
+        return VORSTELLEN_START
+    except Exception as e:
+        logger.error(f"Vorstellen rasm URL xatosi: {e}")
+
+    # Usul 3: Disk dan (local)
     try:
         if os.path.exists(VORSTELLEN_CARD_PATH):
-            await query.message.reply_photo(
+            sent = await query.message.reply_photo(
                 photo=open(VORSTELLEN_CARD_PATH, "rb"),
-                caption=(
-                    "🎤 *VORSTELLEN — O'zingizni taqdim etish*\n\n"
-                    "📋 7 ta savol mavjud — barcha bo'limlarni yoritishga harakat qiling\n\n"
-                    "⏱ *Sizga 10 daqiqa vaqt berildi!*\n"
-                    "Tayyorlanib bo'lgach, ovozli xabar yoki yozma matn yuboring 👇"
-                ),
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
-                    [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
-                ])
+                caption=caption,
+                reply_markup=keyboard,
             )
-        else:
-            await query.message.reply_text(
-                "🎤 VORSTELLEN — O'zingizni taqdim etish\n\n"
-                "📋 7 ta savol mavjud\n\n"
-                "⏱ Sizga 10 daqiqa vaqt berildi!\n"
-                "Tayyorlanib bo'lgach, ovozli xabar yoki yozma matn yuboring 👇",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
-                    [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
-                ])
-            )
+            if sent.photo:
+                context.bot_data["vorstellen_card_file_id"] = sent.photo[-1].file_id
+            return VORSTELLEN_START
     except Exception as e:
-        logger.error(f"Vorstellen menu rasm xatosi: {e}")
-        await query.message.reply_text(
-            "🎤 Vorstellen boshlash uchun tugmani bosing:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
-                [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
-            ])
-        )
+        logger.error(f"Vorstellen rasm disk xatosi: {e}")
+
+    # Usul 4: Rasm bo'lmasa matn
+    await query.message.reply_text(
+        caption,
+        reply_markup=keyboard,
+    )
     return VORSTELLEN_START
 
 
