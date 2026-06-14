@@ -61,10 +61,17 @@ class Database:
                     total_conversations INTEGER DEFAULT 0,
                     total_flashcards INTEGER DEFAULT 0,
                     total_pomodoro_minutes INTEGER DEFAULT 0,
-                    words_learned INTEGER DEFAULT 0
+                    words_learned INTEGER DEFAULT 0,
+                    phone TEXT DEFAULT NULL
                 )
             """)
 
+
+            # Phone ustunini qo'shish (agar mavjud bo'lmasa)
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT NULL")
+            except Exception:
+                pass  # Ustun allaqachon mavjud
             # 2. Xatolar banki (har bir xato + mini-dars)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mistakes (
@@ -718,6 +725,60 @@ class Database:
                 if row["words_learned_today"]:
                     all_words.extend(json.loads(row["words_learned_today"]))
             return list(set(all_words))
+
+
+    def update_user_phone(self, user_id: int, phone: str) -> bool:
+        """Telefon raqamini saqlash"""
+        try:
+            with self._connect() as conn:
+                conn.execute(
+                    "UPDATE users SET phone = ? WHERE user_id = ?",
+                    (phone, user_id)
+                )
+            return True
+        except Exception as e:
+            logger.error(f"update_user_phone xato: {e}")
+            return False
+
+    def get_user_count(self) -> int:
+        """Jami foydalanuvchilar soni"""
+        try:
+            with self._connect() as conn:
+                row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
+                return row[0] if row else 0
+        except Exception as e:
+            logger.error(f"get_user_count xato: {e}")
+            return 0
+
+    def get_all_users_for_admin(self) -> list:
+        """Admin uchun barcha foydalanuvchilar"""
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT user_id, username, first_name, last_name, phone, current_level, total_xp "
+                    "FROM users ORDER BY created_at DESC"
+                ).fetchall()
+                cols = ["user_id", "username", "first_name", "last_name", "phone", "current_level", "total_xp"]
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error(f"get_all_users_for_admin xato: {e}")
+            return []
+
+    def search_by_phone(self, phone_query: str) -> list:
+        """Telefon raqami bo'yicha qidirish"""
+        try:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT user_id, username, first_name, last_name, phone, current_level "
+                    "FROM users WHERE phone LIKE ?",
+                    (f"%{phone_query}%",)
+                ).fetchall()
+                cols = ["user_id", "username", "first_name", "last_name", "phone", "current_level"]
+                return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.error(f"search_by_phone xato: {e}")
+            return []
+
 
 
 # Global database instance
