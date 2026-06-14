@@ -10,7 +10,10 @@ import json
 import random
 import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes, ConversationHandler
+from telegram.ext import (
+    ContextTypes, ConversationHandler,
+    CallbackQueryHandler, MessageHandler, filters,
+)
 
 from config import (
     logger, GROQ_API_KEY, GROQ_API_URL, DEFAULT_AI_MODEL,
