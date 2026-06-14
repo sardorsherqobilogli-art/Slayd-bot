@@ -1434,12 +1434,12 @@ def main() -> None:
 
             # Vorstellen — matn VA ovoz
             VORSTELLEN_MENU: reply_keyboard_handlers + common_handlers + [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
-                MessageHandler(voice_filter, vorstellen_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
+                MessageHandler(voice_filter, vorstellen_process_new),
             ],
             VORSTELLEN_FOLLOWUP: reply_keyboard_handlers + common_handlers + [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process),
-                MessageHandler(voice_filter, vorstellen_process),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
+                MessageHandler(voice_filter, vorstellen_process_new),
             ],
             VORSTELLEN_RESULT: reply_keyboard_handlers + common_handlers,
 
