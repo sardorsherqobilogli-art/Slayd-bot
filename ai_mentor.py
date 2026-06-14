@@ -2,18 +2,13 @@
 # -*- coding: utf-8 -*-
 """
 DEUTSCH MEISTER PRO - AI Mentor Moduli (TO'LIQ QAYTA YOZILGAN)
-Daraja aniqlash, Vorstellen (vorstellen_complete.py bilan to'liq), Erfahrungen, Xato banki,
+Daraja aniqlash, Vorstellen, Erfahrungen, Xato banki,
 Ovozli Lug'at (A1-B2, 20 mavzu, 25 so'z), Rolli O'yin (TELC/Goethe uslubi)
 """
 
 import json
 import random
 import httpx
-import os
-import logging
-import subprocess
-import tempfile
-from io import BytesIO
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
 
@@ -40,14 +35,6 @@ from voice_engine import speak_text, listen_to_voice, analyze_pronunciation
     ROLEPLAY_MENU, ROLEPLAY_LEVEL, ROLEPLAY_TOPIC, ROLEPLAY_RULES, ROLEPLAY_CHAT, ROLEPLAY_RESULT,
     AI_MENTOR_SETTINGS,
 ) = range(100, 139)
-
-# ── vorstellen_complete.py bilan mos STATE RAQAMLARI ─────────────────────────
-# main.py import qiladigan Vorstellen state'lari (200-202)
-VORSTELLEN_START    = 200   # Savollar davom etayotgan vaqt
-VORSTELLEN_FOLLOWUP = 201   # Ovoz qabul qilingandan keyin
-# VORSTELLEN_RESULT   = 202 — yuqorida range(100,139) da allaqachon 117 sifatida
-# Shuning uchun VORSTELLEN_RESULT = 117, lekin VS uchun 202 ham alias bo'lsin:
-VORSTELLEN_RESULT_VS = 202  # vs_ callback lar uchun (result page alias)
 
 
 # ==================== GROQ AI HELPERS ====================
@@ -914,8 +901,8 @@ async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_T
             '  "vocabulary_score": 1-10,\n'
             '  "fluency_score": 1-10,\n'
             '  "detected_level": "A1 yoki A2 yoki B1 yoki B2",\n'
-            '  "tushuntirish": "xatolar va grammatika tushuntirish o'zbek tilida",\n'
-            '  "tarjima": "to'g'ri nemischa variant",\n'
+            '  "tushuntirish": "xatolar va grammatika tushuntirish uzbek tilida",\n'
+            '  "tarjima": "togri nemischa variant",\n'
             '  "yaxshilash_a1": "A1 darajasida mukammal variant",\n'
             '  "yaxshilash_a2": "A2 darajasida mukammal variant",\n'
             '  "yaxshilash_b1": "B1 darajasida mukammal variant",\n'
@@ -1121,68 +1108,240 @@ async def vs_speak_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 
 async def vorstellen_pdf_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """PDF yaratish va yuborish - yangi"""
+    """Mukammal PDF yaratish va yuborish - reportlab bilan"""
     query = update.callback_query
     await query.answer("📄 PDF yaratilmoqda...")
 
     v_data = context.user_data.get("vorstellen", {})
-    level = context.user_data.get("vs_improved_level", context.user_data.get("vs_level", "A1"))
+    result = context.user_data.get("vs_result", {})
+    level = context.user_data.get("vs_improved_level", context.user_data.get("vs_level", "A1")).upper()
+    score = context.user_data.get("vs_score", 0)
     improved_text = context.user_data.get("vs_improved_text", "")
+    user_id = query.from_user.id
 
     if not improved_text:
-        # Agar yaxshilash bosilmagan bo'lsa, AI dan so'rash
         all_text = "\n".join([f"Savol {a['q_num']}: {a['text']}" for a in v_data.get("answers", []) if a.get("text")])
-
-        ai_result = await groq_chat([
+        improved_text = await groq_chat([
             {"role": "system", "content": (
-                f"Siz nemis tili o'qituvchisisiz. Foydalanuvchi javoblarini {level.upper()} darajasida "
-                f"mukammallashtiring. Faqat nemischa javob bering."
+                f"Nemis tili o'qituvchisi. Javoblarni {level} darajasida mukammallashtir. "
+                f"Faqat nemischa, uzun va to'liq matn."
             )},
-            {"role": "user", "content": f"Javoblarni mukammallashtir:\n{all_text}"}
+            {"role": "user", "content": f"Mukammallashtir:\n{all_text}"}
         ], max_tokens=1024)
-
-        improved_text = ai_result
         context.user_data["vs_improved_text"] = improved_text
 
-    # PDF yaratish (oddiy matn shaklida)
-    pdf_content = f"""VORSTELLEN - MUKAMMAL VARIANT
+    # Foydalanuvchi javoblari
+    user_answers_list = [
+        f"{a['q_num']}. {a.get('text', '')}" for a in v_data.get("answers", []) if a.get("text")
+    ]
 
-Daraja: {level.upper()}
-Deutsch Meister Pro | @Muminov_Abdullokh
+    # Maslahatlar
+    tips = [
+        "Bu matnni yodlang va har kuni ovozda mashq qiling.",
+        "Har kuni 5 marta takrorlang — muskul xotirasi hosil bo'ladi.",
+        "Ovozingizni yozib, so'ng tinglang va taqqoslang.",
+        "Imtihonda 15 soniya tayyorlanish vaqtingiz bor — tez o'ylang!",
+        "7 ta bo'limning barchasini albatta yoritib bering.",
+    ]
 
-SIZNING MA'LUMOTLARINGIZ:
-"""
-    for i, ans in enumerate(v_data.get('answers', []), 1):
-        if ans.get('text'):
-            pdf_content += f"\nSavol {i}: {ans['text'][:100]}..."
+    # ── REPORTLAB IMPORT ──
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.platypus import (
+            Paragraph, Spacer, Table, TableStyle, HRFlowable,
+            BaseDocTemplate, Frame, PageTemplate as PT,
+        )
+        import io as _io
 
-    pdf_content += f"""
+        BLACK = colors.HexColor("#1a1a1a")
+        RED   = colors.HexColor("#CC0000")
+        GOLD  = colors.HexColor("#D4A017")
+        DARK  = colors.HexColor("#2C2C2C")
+        LGRAY = colors.HexColor("#F5F5F5")
+        WHITE = colors.white
 
-MUKAMMAL VARIANT ({level.upper()}):
-{improved_text}
+        PAGE_W, PAGE_H = A4
+        MARGIN_L = 2.0 * cm
+        MARGIN_R = 2.0 * cm
+        MARGIN_T = 2.2 * cm
+        MARGIN_B = 2.0 * cm
+        CONTENT_W = PAGE_W - MARGIN_L - MARGIN_R
 
-MASLAHATLAR:
-• Bu matnni yodlang va ovozli xabar sifatida yuboring
-• Har kuni 5 marta takrorlang
-• Ovozingizni yozib, tinglang
-• Imtihonda 15 soniya tayyorlanish vaqti bor - tez o'ylang!
+        LOGO_SIZE = 3.0 * cm
+        logo_x = MARGIN_L
+        logo_y = PAGE_H - MARGIN_T - LOGO_SIZE - 4
+        badge_x = PAGE_W - MARGIN_R - 2.4 * cm
+        badge_y = logo_y + LOGO_SIZE * 0.2
+        sep_y   = logo_y - 0.3 * cm
+        stars_y = sep_y - 0.7 * cm
+        CONTENT_START_Y = stars_y - 1.4 * cm
 
-@Muminov_Abdullokh | t.me/sprechenmitspass | Deutsch Meister Pro
-"""
+        LOGO_PATH = '/home/claude/logo_transparent.png'
 
-    # PDF sifatida yuborish (oddiy txt fayl sifatida)
-    from io import BytesIO
-    pdf_buffer = BytesIO(pdf_content.encode('utf-8'))
+        # Ballar
+        grammar_score  = result.get("grammar_score", 0)
+        vocab_score    = result.get("vocabulary_score", 0)
+        fluency_score  = result.get("fluency_score", 0)
+        detected_lvl   = result.get("detected_level", level)
 
-    await query.message.reply_document(
-        document=pdf_buffer,
-        filename=f"Vorstellen_{level}_{query.from_user.id}.txt",
-        caption=f"✅ *Vorstellen - {level.upper()} darajasida*\n\n"
-                f"📄 Fayl tayyor!\n"
-                f"💡 Bu matnni yodlang va har kuni takrorlang!\n\n"
-                f"@Muminov_Abdullokh | t.me/sprechenmitspass",
-        parse_mode="MarkdownV2"
-    )
+        def draw_page(c, doc):
+            bar_h = 6
+            c.setFillColor(BLACK); c.rect(0, PAGE_H-bar_h, PAGE_W/3, bar_h, fill=1, stroke=0)
+            c.setFillColor(RED);   c.rect(PAGE_W/3, PAGE_H-bar_h, PAGE_W/3, bar_h, fill=1, stroke=0)
+            c.setFillColor(GOLD);  c.rect(PAGE_W*2/3, PAGE_H-bar_h, PAGE_W/3, bar_h, fill=1, stroke=0)
+            c.setFillColor(GOLD);  c.rect(0, 0, PAGE_W/3, bar_h, fill=1, stroke=0)
+            c.setFillColor(RED);   c.rect(PAGE_W/3, 0, PAGE_W/3, bar_h, fill=1, stroke=0)
+            c.setFillColor(BLACK); c.rect(PAGE_W*2/3, 0, PAGE_W/3, bar_h, fill=1, stroke=0)
+            # Logo
+            import os
+            if os.path.exists(LOGO_PATH):
+                try:
+                    c.drawImage(LOGO_PATH, logo_x, logo_y, width=LOGO_SIZE, height=LOGO_SIZE,
+                                mask='auto', preserveAspectRatio=True)
+                except Exception:
+                    pass
+            # Sarlavha
+            c.setFont("Helvetica-Bold", 22); c.setFillColor(BLACK)
+            c.drawString(logo_x + LOGO_SIZE + 0.5*cm, logo_y + LOGO_SIZE*0.6, "VORSTELLEN")
+            c.setFont("Helvetica-Bold", 11); c.setFillColor(RED)
+            c.drawString(logo_x + LOGO_SIZE + 0.5*cm, logo_y + LOGO_SIZE*0.25,
+                         "Mukammal Natija  |  Deutsch Meister Pro")
+            # Badge
+            c.setFillColor(RED); c.roundRect(badge_x, badge_y, 2.4*cm, 1.0*cm, 5, fill=1, stroke=0)
+            c.setFillColor(WHITE); c.setFont("Helvetica-Bold", 18)
+            c.drawCentredString(badge_x + 1.2*cm, badge_y + 0.22*cm, level)
+            # Chiziq
+            c.setStrokeColor(GOLD); c.setLineWidth(2)
+            c.line(MARGIN_L, sep_y, PAGE_W - MARGIN_R, sep_y)
+            # Yulduzlar (unicode emas, ASCII)
+            c.setFont("Helvetica-Bold", 13); c.setFillColor(GOLD)
+            stars_str = "* " * score + "o " * (7 - score)
+            c.drawString(MARGIN_L, stars_y, stars_str)
+            yulduz_map = {7:"Mukammal! Barcha bolimlar yoritilgan.",
+                          6:"Yaxshi! 1 ta bolim yetishmayapti.",
+                          5:"Orta. 2 ta bolim qoldirilgan.",
+                          4:"Qoniqarli. 3 ta bolim yetishmayapti.",
+                          3:"Kam. 4 ta bolim qoldirilgan.",
+                          2:"Juda kam. 5 ta bolim yetishmayapti.",
+                          1:"Yomon. 6 ta bolim qoldirilgan."}
+            c.setFont("Helvetica", 9); c.setFillColor(DARK)
+            c.drawString(MARGIN_L, stars_y - 0.42*cm, yulduz_map.get(score, ""))
+
+        class VorstellenDoc(BaseDocTemplate):
+            def __init__(self, buf, **kw):
+                super().__init__(buf, **kw)
+                frame = Frame(MARGIN_L, MARGIN_B, CONTENT_W, CONTENT_START_Y - MARGIN_B,
+                              leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0, id='main')
+                self.addPageTemplates([PT('first', [frame], onPage=draw_page)])
+
+        def sec_h(text, color=RED):
+            return Paragraph(f"<b>{text}</b>",
+                ParagraphStyle("SH", fontName="Helvetica-Bold", fontSize=10.5,
+                               textColor=color, spaceBefore=6, spaceAfter=3, leading=15,
+                               backColor=LGRAY, borderPad=3))
+
+        def body(text, size=9.5):
+            return Paragraph(text,
+                ParagraphStyle("BP", fontName="Helvetica", fontSize=size,
+                               textColor=DARK, leading=14, spaceAfter=2))
+
+        def german(text):
+            return Paragraph(f"<i>{text}</i>",
+                ParagraphStyle("GP", fontName="Helvetica-Oblique", fontSize=10,
+                               textColor=BLACK, leading=16, spaceAfter=3))
+
+        # ── STORY ──
+        story = []
+
+        # Ball jadvali
+        cw = CONTENT_W / 4
+        tbl = Table([
+            ["Korsatkich", "Ball", "Korsatkich", "Ball"],
+            ["Umumiy ball", f"{score}/7", "Daraja", detected_lvl],
+            ["Grammatika",  f"{grammar_score}/10", "Soz boyligi", f"{vocab_score}/10"],
+            ["Ravonlik",    f"{fluency_score}/10", "", ""],
+        ], colWidths=[cw*1.6, cw*0.9, cw*1.6, cw*0.9])
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,0), BLACK), ("TEXTCOLOR", (0,0), (-1,0), WHITE),
+            ("FONTNAME",      (0,0), (-1,0), "Helvetica-Bold"), ("FONTSIZE", (0,0), (-1,0), 9),
+            ("ALIGN",         (0,0), (-1,-1), "CENTER"), ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("FONTNAME",      (0,1), (-1,-1), "Helvetica"), ("FONTSIZE", (0,1), (-1,-1), 10),
+            ("ROWBACKGROUNDS",(0,1), (-1,-1), [LGRAY, WHITE]),
+            ("BACKGROUND",    (2,1), (3,1), RED), ("TEXTCOLOR", (2,1), (3,1), WHITE),
+            ("FONTNAME",      (2,1), (3,1), "Helvetica-Bold"), ("FONTSIZE", (2,1), (3,1), 11),
+            ("GRID",          (0,0), (-1,-1), 0.5, colors.HexColor("#CCCCCC")),
+            ("TOPPADDING",    (0,0), (-1,-1), 5), ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ]))
+        story.append(tbl)
+        story.append(Spacer(1, 0.3*cm))
+
+        # Javoblar
+        story.append(sec_h("SIZNING JAVOBLARINGIZ", BLACK))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD))
+        story.append(Spacer(1, 0.08*cm))
+        for line in user_answers_list:
+            story.append(body(line))
+        story.append(Spacer(1, 0.25*cm))
+
+        # Mukammal variant
+        story.append(sec_h(f"MUKAMMAL VARIANT ({level} DARAJASI)", RED))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD))
+        story.append(Spacer(1, 0.08*cm))
+        for sent in improved_text.split(". "):
+            s = sent.strip()
+            if s:
+                story.append(german(s + "."))
+        story.append(Spacer(1, 0.25*cm))
+
+        # Maslahatlar
+        story.append(sec_h("MASLAHATLAR", DARK))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=GOLD))
+        story.append(Spacer(1, 0.08*cm))
+        for i, tip in enumerate(tips, 1):
+            story.append(body(f"{i}. {tip}"))
+
+        story.append(Spacer(1, 0.3*cm))
+        story.append(HRFlowable(width="100%", thickness=2, color=RED))
+        story.append(Paragraph(
+            "@Muminov_Abdullokh  |  t.me/sprechenmitspass  |  Deutsch Meister Pro",
+            ParagraphStyle("Footer", fontName="Helvetica", fontSize=8,
+                           textColor=colors.HexColor("#555555"), alignment=TA_CENTER, spaceBefore=4)
+        ))
+
+        # ── BUILD ──
+        buf = _io.BytesIO()
+        doc = VorstellenDoc(
+            buf, pagesize=A4,
+            rightMargin=MARGIN_R, leftMargin=MARGIN_L,
+            topMargin=PAGE_H - CONTENT_START_Y, bottomMargin=MARGIN_B,
+        )
+        doc.build(story)
+        buf.seek(0)
+
+        await query.message.reply_document(
+            document=buf,
+            filename=f"Vorstellen_{level}_{user_id}.pdf",
+            caption=f"✅ *Vorstellen \\- {level} darajasida mukammal PDF*\n\n"
+                    f"📄 Yuklab oling va yodlang\\!\n"
+                    f"@Muminov\\_Abdullokh \\| t\\.me/sprechenmitspass",
+            parse_mode="MarkdownV2"
+        )
+
+    except ImportError:
+        # Reportlab yo'q bo'lsa txt yuboramiz
+        from io import BytesIO as _BIO
+        content = f"VORSTELLEN - {level}\n\nJAVOBLAR:\n"
+        content += "\n".join(user_answers_list)
+        content += f"\n\nMUKAMMAL VARIANT:\n{improved_text}"
+        buf = _BIO(content.encode("utf-8"))
+        await query.message.reply_document(
+            document=buf, filename=f"Vorstellen_{level}_{user_id}.txt",
+            caption=f"✅ Vorstellen - {level}"
+        )
 
     return VORSTELLEN_RESULT
 
@@ -2467,3 +2626,18 @@ async def ai_mentor_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         reply_markup=ai_mentor_menu_keyboard(),
     )
     return AI_MENTOR_MENU
+
+
+# ==================== main.py UCHUN ALIAS'LAR ====================
+# main__8_.py eski nomlarni import qiladi — shu alias'lar mos qiladi
+
+vorstellen_start    = vorstellen_start_new
+vorstellen_process  = vorstellen_process_new
+vs_show_section     = vs_show_section_new
+vs_speak_handler    = vs_speak_new
+
+# main.py VORSTELLEN_START (200) va VORSTELLEN_FOLLOWUP (201) kutadi
+# Lekin ai_mentor_work da Vorstellen state'lari range(100,139) ichida
+# VORSTELLEN_MENU=107, VORSTELLEN_Q1=109... shu state'larga yo'naltirish
+VORSTELLEN_START    = VORSTELLEN_MENU      # 107 — birinchi savol state
+VORSTELLEN_FOLLOWUP = VORSTELLEN_Q1       # 109 — jarayon davomida
