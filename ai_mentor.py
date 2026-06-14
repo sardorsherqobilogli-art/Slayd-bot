@@ -9,6 +9,16 @@ Ovozli Lug'at (A1-B2, 20 mavzu, 25 so'z), Rolli O'yin (TELC/Goethe uslubi)
 import json
 import random
 import httpx
+import io
+import os
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.units import cm, mm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.utils import ImageReader
+from PIL import Image
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ContextTypes, ConversationHandler,
@@ -609,29 +619,387 @@ def vorstellen_result_keyboard():
     ])
 
 
+
+# ==================== VORSTELLEN PDF FUNKSIYALARI ====================
+
+VORSTELLEN_CARD_PATH = os.path.join(os.path.dirname(__file__), "vorstellen_card.jpg")
+
+def _draw_watermark(c, doc):
+    """Har sahifaga xira logo watermark chizadi"""
+    try:
+        if not os.path.exists(VORSTELLEN_CARD_PATH):
+            return
+        c.saveState()
+        img = Image.open(VORSTELLEN_CARD_PATH).convert("RGBA")
+        r, g, b, a = img.split()
+        a = a.point(lambda x: int(x * 0.10))
+        img_wm = Image.merge("RGBA", (r, g, b, a))
+        buf = io.BytesIO()
+        img_wm.save(buf, format="PNG")
+        buf.seek(0)
+        logo = ImageReader(buf)
+        pw, ph = A4
+        c.drawImage(logo, 0, 0, width=pw, height=ph, mask="auto")
+        c.restoreState()
+    except Exception:
+        pass
+
+
+def create_vorstellen_tayyorlov_pdf(savollar: list) -> bytes:
+    """7 ta savol + shablonlar — tayyorlov varag'i PDF"""
+    NAVY   = colors.HexColor("#1a237e")
+    RED    = colors.HexColor("#c62828")
+    GOLD   = colors.HexColor("#e65100")
+    TEAL   = colors.HexColor("#00695c")
+    INDIGO = colors.HexColor("#283593")
+    PURPLE = colors.HexColor("#4a148c")
+    BROWN  = colors.HexColor("#4e342e")
+    WHITE  = colors.white
+    BLACK  = colors.HexColor("#1a1a1a")
+    BG     = [
+        colors.HexColor("#e8eaf6"), colors.HexColor("#fce4ec"),
+        colors.HexColor("#e0f2f1"), colors.HexColor("#fff8e1"),
+        colors.HexColor("#f3e5f5"), colors.HexColor("#fbe9e7"),
+        colors.HexColor("#e8f5e9"),
+    ]
+    QC = [NAVY, RED, TEAL, GOLD, PURPLE, BROWN, INDIGO]
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+        rightMargin=1.4*cm, leftMargin=1.4*cm,
+        topMargin=1.2*cm, bottomMargin=1.2*cm,
+        onFirstPage=_draw_watermark, onLaterPages=_draw_watermark)
+
+    S = getSampleStyleSheet()
+    def ps(n, **kw): return ParagraphStyle(n, parent=S["Normal"], **kw)
+
+    W = 18.2*cm
+    elements = []
+
+    # Header
+    ht = Table([[Paragraph("🎤  VORSTELLEN — 7 ta Tayyorlov Savol",
+        ps("th", fontSize=19, textColor=WHITE, alignment=TA_CENTER,
+           fontName="Helvetica-Bold", leading=23))]], colWidths=[W])
+    ht.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),6)]))
+    elements.append(ht)
+
+    st = Table([[Paragraph(
+        "Deutsch Meister Pro  •  TELC / Goethe uslubi  •  10 daqiqa tayyorlanish",
+        ps("ts", fontSize=9, textColor=colors.HexColor("#bbdefb"),
+           alignment=TA_CENTER, fontName="Helvetica"))]], colWidths=[W])
+    st.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),INDIGO),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
+    elements.append(st)
+    elements.append(Spacer(1, 5*mm))
+
+    for i, savol in enumerate(savollar):
+        c, bg = QC[i], BG[i]
+        # Raqam + mavzu
+        top = Table([[
+            Paragraph(str(savol["id"]),
+                ps(f"n{i}", fontSize=15, textColor=WHITE, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER)),
+            Paragraph(f"📌  {savol['mavzu']}",
+                ps(f"m{i}", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER)),
+        ]], colWidths=[1.1*cm, 17.1*cm])
+        top.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),c),
+            ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+            ("LEFTPADDING",(1,0),(1,0),10)]))
+        elements.append(top)
+
+        # Savol matni
+        qt = Table([[
+            Paragraph(f"🇩🇪  {savol['nemis']}",
+                ps(f"de{i}", fontSize=10, textColor=BLACK, fontName="Helvetica-Bold",
+                   leading=14)),
+            Paragraph(f"🇺🇿  {savol['uzbek']}",
+                ps(f"uz{i}", fontSize=9, textColor=colors.HexColor("#444"),
+                   fontName="Helvetica-Oblique", leading=13)),
+        ]], colWidths=[9.1*cm, 9.1*cm])
+        qt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),bg),
+            ("TOPPADDING",(0,0),(-1,-1),7),("BOTTOMPADDING",(0,0),(-1,-1),7),
+            ("LEFTPADDING",(0,0),(-1,-1),8),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        elements.append(qt)
+
+        # Shablonlar
+        a1 = savol.get("shablon_a1", [""])[0]
+        b1 = savol.get("shablon_b1", [""])[0]
+        sht = Table([
+            [Paragraph("A1/A2  shablon",
+                ps(f"sh{i}", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER)),
+             Paragraph("B1/B2  shablon",
+                ps(f"sb{i}", fontSize=8, textColor=WHITE, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER))],
+            [Paragraph(a1, ps(f"sa{i}", fontSize=8.5, textColor=BLACK,
+                fontName="Helvetica", leading=12)),
+             Paragraph(b1, ps(f"sc{i}", fontSize=8.5, textColor=BLACK,
+                fontName="Helvetica", leading=12))],
+        ], colWidths=[9.1*cm, 9.1*cm])
+        sht.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(0,0),GOLD),("BACKGROUND",(1,0),(1,0),TEAL),
+            ("BACKGROUND",(0,1),(0,1),colors.HexColor("#fff8e1")),
+            ("BACKGROUND",(1,1),(1,1),colors.HexColor("#e8f5e9")),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("LEFTPADDING",(0,0),(-1,-1),8),("VALIGN",(0,0),(-1,-1),"TOP")]))
+        elements.append(sht)
+        elements.append(Spacer(1, 3*mm))
+
+    # Eslatma
+    elements.append(Spacer(1, 2*mm))
+    nt = Table([[Paragraph(
+        "⏱  Imtihonda 30 soniya tayyorlanish beriladi  •  "
+        "Barcha 7 bo'limni yoritishga harakat qiling  •  "
+        "Og'zaki yoki yozma javob yuboring!",
+        ps("no", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold",
+           alignment=TA_CENTER, leading=14))]], colWidths=[W])
+    nt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),RED),
+        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
+    elements.append(nt)
+    elements.append(Spacer(1, 3*mm))
+    elements.append(Paragraph(
+        "t.me/sprechenmitspass  •  Deutsch Meister Pro  •  @Muminov_Abdullokh",
+        ps("fo", fontSize=8, textColor=colors.HexColor("#666"),
+           alignment=TA_CENTER, fontName="Helvetica")))
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.read()
+
+
+def create_vorstellen_natija_pdf(
+    user_answers: list, result: dict, score: int, level: str, missed: list
+) -> bytes:
+    """Natija tahlil PDF — premium"""
+    NAVY  = colors.HexColor("#1a237e")
+    RED   = colors.HexColor("#c62828")
+    GOLD  = colors.HexColor("#e65100")
+    TEAL  = colors.HexColor("#00695c")
+    WHITE = colors.white
+    BLACK = colors.HexColor("#1a1a1a")
+    GRAY  = colors.HexColor("#555555")
+    LGRAY = colors.HexColor("#f5f5f5")
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+        rightMargin=1.5*cm, leftMargin=1.5*cm,
+        topMargin=1.3*cm, bottomMargin=1.3*cm,
+        onFirstPage=_draw_watermark, onLaterPages=_draw_watermark)
+
+    S = getSampleStyleSheet()
+    def ps(n, **kw): return ParagraphStyle(n, parent=S["Normal"], **kw)
+    W = 18*cm
+    elements = []
+
+    # Header
+    ht = Table([[Paragraph("🎤  VORSTELLEN — Natija va Tahlil",
+        ps("ht", fontSize=18, textColor=WHITE, alignment=TA_CENTER,
+           fontName="Helvetica-Bold", leading=22))]], colWidths=[W])
+    ht.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),NAVY),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),6)]))
+    elements.append(ht)
+    st = Table([[Paragraph(
+        "Deutsch Meister Pro  •  @Muminov_Abdullokh  •  t.me/sprechenmitspass",
+        ps("st", fontSize=9, textColor=colors.HexColor("#bbdefb"),
+           alignment=TA_CENTER, fontName="Helvetica"))]], colWidths=[W])
+    st.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#283593")),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
+    elements.append(st)
+    elements.append(Spacer(1, 5*mm))
+
+    # Ball va daraja
+    stars = "⭐" * score + "☆" * (7 - score)
+    ball_t = Table([[
+        Paragraph(f"{score}/7\n{stars}",
+            ps("sc", fontSize=22, textColor=NAVY, fontName="Helvetica-Bold",
+               alignment=TA_CENTER)),
+        Table([
+            [Paragraph(f"Daraja: {level}",
+                ps("lv", fontSize=14, textColor=GOLD, fontName="Helvetica-Bold",
+                   alignment=TA_CENTER))],
+            [Paragraph(f"Grammatika: {result.get('grammar_score',5)}/10",
+                ps("g1", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold"))],
+            [Paragraph(f"So'z boyligi: {result.get('vocabulary_score',5)}/10",
+                ps("g2", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold"))],
+            [Paragraph(f"Ravonlik: {result.get('fluency_score',5)}/10",
+                ps("g3", fontSize=9.5, textColor=BLACK, fontName="Helvetica-Bold"))],
+        ], colWidths=[9*cm]),
+    ]], colWidths=[7*cm, 11*cm])
+    ball_t.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#e8eaf6")),
+        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+        ("TOPPADDING",(0,0),(-1,-1),10),("BOTTOMPADDING",(0,0),(-1,-1),10),
+        ("LEFTPADDING",(0,0),(-1,-1),10),
+        ("BOX",(0,0),(-1,-1),1.5,NAVY)]))
+    elements.append(ball_t)
+    elements.append(Spacer(1, 4*mm))
+
+    # Javoblar
+    sec = lambda txt, bg: Table([[Paragraph(txt,
+        ps("s"+txt[:4], fontSize=11, textColor=WHITE, fontName="Helvetica-Bold",
+           leading=14))]], colWidths=[W])
+    def sec_table(txt, bg):
+        t = Table([[Paragraph(txt,
+            ps("s"+str(len(txt)), fontSize=11, textColor=WHITE,
+               fontName="Helvetica-Bold", leading=14))]], colWidths=[W])
+        t.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),bg),
+            ("TOPPADDING",(0,0),(-1,-1),6),("BOTTOMPADDING",(0,0),(-1,-1),6),
+            ("LEFTPADDING",(0,0),(-1,-1),10)]))
+        return t
+
+    elements.append(sec_table("📝  Sizning javoblaringiz", NAVY))
+    ans_rows = []
+    for i, ans in enumerate(user_answers[:7], 1):
+        txt = ans.get("text","—") if isinstance(ans,dict) else str(ans)
+        ans_rows.append([
+            Paragraph(f"{i}.", ps(f"an{i}", fontSize=9.5, textColor=BLACK,
+                fontName="Helvetica-Bold")),
+            Paragraph(txt, ps(f"at{i}", fontSize=9.5, textColor=BLACK,
+                fontName="Helvetica", leading=14)),
+        ])
+    if ans_rows:
+        at = Table(ans_rows, colWidths=[0.7*cm, 17.3*cm])
+        at.setStyle(TableStyle([
+            ("ROWBACKGROUNDS",(0,0),(-1,-1),[WHITE,LGRAY]),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+            ("LEFTPADDING",(0,0),(-1,-1),8)]))
+        elements.append(at)
+    elements.append(Spacer(1, 4*mm))
+
+    # Xatolar
+    errors = result.get("grammar_errors",[])
+    if errors:
+        elements.append(sec_table("❌  Grammatik xatolar va to'g'rilash", RED))
+        err_rows = [[
+            Paragraph("❌ Xato", ps("eh", fontSize=9.5, textColor=BLACK,
+                fontName="Helvetica-Bold")),
+            Paragraph("✅ To'g'ri", ps("ec", fontSize=9.5, textColor=BLACK,
+                fontName="Helvetica-Bold"))
+        ]]
+        for e in errors[:8]:
+            err_rows.append([
+                Paragraph(e.get("xato",""),
+                    ps("ex"+e.get("xato","")[:4], fontSize=9, textColor=RED,
+                       fontName="Helvetica", leading=13)),
+                Paragraph(e.get("togri",""),
+                    ps("ef"+e.get("togri","")[:4], fontSize=9, textColor=TEAL,
+                       fontName="Helvetica-Bold", leading=13)),
+            ])
+        et = Table(err_rows, colWidths=[9*cm, 9*cm])
+        et.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#ffebee")),
+            ("ROWBACKGROUNDS",(0,1),(-1,-1),[WHITE,LGRAY]),
+            ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5),
+            ("LEFTPADDING",(0,0),(-1,-1),8),
+            ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#dddddd"))]))
+        elements.append(et)
+        elements.append(Spacer(1, 4*mm))
+
+    # Mukammal variant
+    best = result.get("yaxshilash_b1", result.get("tarjima",""))
+    if best:
+        elements.append(sec_table(f"🏆  Mukammal variant ({level} darajasi)", TEAL))
+        bt = Table([[Paragraph(best, ps("bt", fontSize=9.5, textColor=BLACK,
+            fontName="Helvetica", leading=14))]], colWidths=[W])
+        bt.setStyle(TableStyle([
+            ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#e8f5e9")),
+            ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8),
+            ("LEFTPADDING",(0,0),(-1,-1),10),
+            ("BOX",(0,0),(-1,-1),1,TEAL)]))
+        elements.append(bt)
+        elements.append(Spacer(1, 4*mm))
+
+    # Maslahatlar
+    elements.append(sec_table("💡  Maslahatlar", GOLD))
+    maslahatlar = [
+        "Bu matnni yodlang va ovozda mashq qiling.",
+        "Har kuni 5 marta takrorlang — muscle memory hosil bo'ladi.",
+        "Ovozingizni yozib, so'ng tinglang va taqqoslang.",
+        "Imtihonda 30 soniya tayyorlanish vaqtingiz bor — tez o'ylang!",
+        "7 ta bo'limning barchasini yoritishga harakat qiling.",
+    ]
+    for g in result.get("good_points",[])[:2]:
+        maslahatlar.insert(0, f"✅ {g}")
+    mt = Table([[Paragraph(f"• {m}", ps(f"ms{j}", fontSize=9.5, textColor=BLACK,
+        fontName="Helvetica", leading=14))] for j,m in enumerate(maslahatlar)],
+        colWidths=[W])
+    mt.setStyle(TableStyle([
+        ("BACKGROUND",(0,0),(-1,-1),colors.HexColor("#fff8e1")),
+        ("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),4),
+        ("LEFTPADDING",(0,0),(-1,-1),12)]))
+    elements.append(mt)
+    elements.append(Spacer(1, 4*mm))
+
+    # Eslatma
+    nt = Table([[Paragraph(
+        "📌  Mukammal variantni yodlang va keyingi safar yanada yaxshiroq natija ko'rsating!",
+        ps("nt", fontSize=9, textColor=WHITE, fontName="Helvetica-Bold",
+           alignment=TA_CENTER, leading=13))]], colWidths=[W])
+    nt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),RED),
+        ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
+    elements.append(nt)
+    elements.append(Spacer(1, 3*mm))
+    elements.append(Paragraph(
+        "t.me/sprechenmitspass  •  Deutsch Meister Pro  •  @Muminov_Abdullokh",
+        ps("ft", fontSize=8, textColor=GRAY, alignment=TA_CENTER, fontName="Helvetica")))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.read()
+
 # ==================== VORSTELLEN HANDLERS (YANGI) ====================
 
 async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen asosiy menyusi - yangi"""
+    """Vorstellen asosiy menyusi — rasm + PDF yuboradi"""
     query = update.callback_query
     await query.answer()
 
+    # Avval xabarni o'chiramiz
     await query.edit_message_text(
-        "🎤 Vorstellen - O'zingizni taqdim etish\n\n"
-        "Goethe / TELC imtihon uslubida\n\n"
-        "📋 7 ta savol:\n"
-        "1️⃣ Ism va yosh\n"
-        "2️⃣ Qayerdansiz\n"
-        "3️⃣ Yashash joyingiz\n"
-        "4️⃣ Oilangiz\n"
-        "5️⃣ Nemis tilini qayerda o'rgandingiz\n"
-        "6️⃣ Nima ish qilasiz\n"
-        "7️⃣ Qaysi tillarni bilasiz\n\n"
-        "⚠️ Imtihonda 15 soniya tayyorlanish vaqti!\n"
-        "Biz sizga 10 daqiqa beramiz\n\n"
-        "Bo'limni tanlang:",
-        reply_markup=vorstellen_main_keyboard()
+        "🎤 Vorstellen tayyorlanmoqda...",
     )
+
+    chat_id = query.message.chat_id
+
+    # Tayyorlov rasmini yuboramiz
+    try:
+        if os.path.exists(VORSTELLEN_CARD_PATH):
+            await query.message.reply_photo(
+                photo=open(VORSTELLEN_CARD_PATH, "rb"),
+                caption=(
+                    "🎤 *VORSTELLEN — O'zingizni taqdim etish*\n\n"
+                    "📋 7 ta savol mavjud — barcha bo'limlarni yoritishga harakat qiling\n\n"
+                    "⏱ *Sizga 10 daqiqa vaqt berildi!*\n"
+                    "Tayyorlanib bo'lgach, ovozli xabar yoki yozma matn yuboring 👇"
+                ),
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
+                    [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
+                ])
+            )
+        else:
+            await query.message.reply_text(
+                "🎤 VORSTELLEN — O'zingizni taqdim etish\n\n"
+                "📋 7 ta savol mavjud\n\n"
+                "⏱ Sizga 10 daqiqa vaqt berildi!\n"
+                "Tayyorlanib bo'lgach, ovozli xabar yoki yozma matn yuboring 👇",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
+                    [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
+                ])
+            )
+    except Exception as e:
+        logger.error(f"Vorstellen menu rasm xatosi: {e}")
+        await query.message.reply_text(
+            "🎤 Vorstellen boshlash uchun tugmani bosing:",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Boshlash", callback_data="vorstellen_go")],
+                [InlineKeyboardButton("🏠 Orqaga", callback_data="ai_mentor_menu")],
+            ])
+        )
     return VORSTELLEN_START
 
 
@@ -977,10 +1345,34 @@ async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["vs_score"] = score
     context.user_data["vs_level"] = level
 
+    # Natija xabarini yuboramiz
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=vorstellen_result_keyboard())
     else:
         await update.message.reply_text(text, reply_markup=vorstellen_result_keyboard())
+
+    # Premium natija PDFni yuboramiz
+    try:
+        pdf_bytes = create_vorstellen_natija_pdf(
+            user_answers=answers,
+            result=result,
+            score=score,
+            level=level,
+            missed=missed,
+        )
+        msg = update.callback_query.message if update.callback_query else update.message
+        await msg.reply_document(
+            document=io.BytesIO(pdf_bytes),
+            filename="Vorstellen_Natija.pdf",
+            caption=(
+                "📄 *Sizning natijangiz PDF formatida!*\n\n"
+                "✅ Mukammal variantni yodlang\n"
+                "🎯 Har kuni mashq qiling — muvaffaqiyat kafolatlangan!"
+            ),
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+        logger.error(f"Vorstellen natija PDF xatosi: {e}")
 
     return VORSTELLEN_RESULT
 
