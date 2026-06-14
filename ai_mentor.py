@@ -617,9 +617,9 @@ async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.answer()
 
     await query.edit_message_text(
-        "🎤 *Vorstellen - O'zingizni taqdim etish*\n\n"
-        "*Goethe / TELC imtihon uslubida*\n\n"
-        "📋 *7 ta savol:*\n"
+        "🎤 Vorstellen - O'zingizni taqdim etish\n\n"
+        "Goethe / TELC imtihon uslubida\n\n"
+        "📋 7 ta savol:\n"
         "1️⃣ Ism va yosh\n"
         "2️⃣ Qayerdansiz\n"
         "3️⃣ Yashash joyingiz\n"
@@ -627,10 +627,9 @@ async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         "5️⃣ Nemis tilini qayerda o'rgandingiz\n"
         "6️⃣ Nima ish qilasiz\n"
         "7️⃣ Qaysi tillarni bilasiz\n\n"
-        "⚠️ *Imtihonda 15 soniya tayyorlanish vaqti!*\n"
-        "*Biz sizga 10 daqiqa beramiz*\n\n"
-        "*Bo'limni tanlang:*",
-        parse_mode="MarkdownV2",
+        "⚠️ Imtihonda 15 soniya tayyorlanish vaqti!\n"
+        "Biz sizga 10 daqiqa beramiz\n\n"
+        "Bo'limni tanlang:",
         reply_markup=vorstellen_main_keyboard()
     )
     return VORSTELLEN_START
@@ -730,13 +729,12 @@ async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYP
     savol = VORSTELLEN_SAVOLLAR[0]
 
     await query.edit_message_text(
-        f"🎤 *Vorstellen - Savol {savol['id']}/7*\n\n"
-        f"🇩🇪 *{esc_md(savol['nemis'])}*\n\n"
-        f"🇺🇿 {esc_md(savol['uzbek'])}\n\n"
-        f"📝 *Javobingizni yozing YOKI*\n"
-        f"🎙️ *Ovozli xabar yuboring*\n\n"
-        f"_(3 martagacha ovoz yuborish mumkin)_",
-        parse_mode="MarkdownV2",
+        f"🎤 Vorstellen - Savol {savol['id']}/7\n\n"
+        f"🇩🇪 {savol['nemis']}\n\n"
+        f"🇺🇿 {savol['uzbek']}\n\n"
+        f"📝 Javobingizni yozing YOKI\n"
+        f"🎙️ Ovozli xabar yuboring\n\n"
+        f"(3 martagacha ovoz yuborish mumkin)",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_skip_1")],
             [InlineKeyboardButton("🏠 Tugatish", callback_data="vorstellen_finish")],
@@ -789,11 +787,10 @@ async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_T
         voice_count = len([v for v in v_data.get("voice_parts", []) if v["q_num"] == current_q])
         if voice_count < 3:
             await update.message.reply_text(
-                f"✅ *Ovoz qabul qilindi!*\n\n"
-                f"_{esc_md(user_text[:100])}..._\n\n"
-                f"*Yana ovoz yuborishni xohlaysizmi?*\n"
-                f"_(Yana {3 - voice_count} ta imkoniyat)_",
-                parse_mode="MarkdownV2",
+                f"✅ Ovoz qabul qilindi!\n\n"
+                f"{user_text[:100]}...\n\n"
+                f"Yana ovoz yuborishni xohlaysizmi?\n"
+                f"(Yana {3 - voice_count} ta imkoniyat)",
                 reply_markup=vorstellen_continue_keyboard(current_q)
             )
             return VORSTELLEN_START
@@ -839,11 +836,11 @@ async def _next_savol(update, context, next_q_num):
         v_data["voice_parts"] = [v for v in v_data.get("voice_parts", []) if v["q_num"] != next_q_num - 1]
 
     text = (
-        f"🎤 *Savol {savol['id']}/7*\n\n"
-        f"🇩🇪 *{esc_md(savol['nemis'])}*\n\n"
-        f"🇺🇿 {esc_md(savol['uzbek'])}\n\n"
-        f"📝 *Javobingizni yozing YOKI*\n"
-        f"🎙️ *Ovozli xabar yuboring*"
+        f"🎤 Savol {savol['id']}/7\n\n"
+        f"🇩🇪 {savol['nemis']}\n\n"
+        f"🇺🇿 {savol['uzbek']}\n\n"
+        f"📝 Javobingizni yozing YOKI\n"
+        f"🎙️ Ovozli xabar yuboring"
     )
 
     keyboard = InlineKeyboardMarkup([
@@ -852,9 +849,9 @@ async def _next_savol(update, context, next_q_num):
     ])
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+        await update.callback_query.edit_message_text(text, reply_markup=keyboard)
     else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+        await update.message.reply_text(text, reply_markup=keyboard)
 
     return VORSTELLEN_START
 
@@ -944,14 +941,14 @@ async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_T
 
     # Natija matni
     text = (
-        f"🎤 *Vorstellen Tahlili*\n\n"
+        f"🎤 Vorstellen Tahlili\n\n"
         f"{stars}\n"
         f"{yulduz_text}\n\n"
-        f"📊 *Ball: {score}/7*\n"
-        f"📚 *Grammatika: {result.get('grammar_score', 5)}/10*\n"
-        f"🗣️ *So'z boyligi: {result.get('vocabulary_score', 5)}/10*\n"
-        f"💬 *Suvliklik: {result.get('fluency_score', 5)}/10*\n\n"
-        f"🎯 *Aniqlangan daraja: {level}*\n\n"
+        f"📊 Ball: {score}/7\n"
+        f"📚 Grammatika: {result.get('grammar_score', 5)}/10\n"
+        f"🗣️ Soz boyligi: {result.get('vocabulary_score', 5)}/10\n"
+        f"💬 Suvliklik: {result.get('fluency_score', 5)}/10\n\n"
+        f"🎯 Aniqlangan daraja: {level}\n\n"
     )
 
     # Qoldirilgan savollar
@@ -981,9 +978,9 @@ async def vorstellen_analyze_new(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data["vs_level"] = level
 
     if update.callback_query:
-        await update.callback_query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=vorstellen_result_keyboard())
+        await update.callback_query.edit_message_text(text, reply_markup=vorstellen_result_keyboard())
     else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=vorstellen_result_keyboard())
+        await update.message.reply_text(text, reply_markup=vorstellen_result_keyboard())
 
     return VORSTELLEN_RESULT
 
@@ -2575,7 +2572,7 @@ async def ai_mentor_menu_handler(update: Update, context: ContextTypes.DEFAULT_T
         "🔧 *Xato banki* \\- Xatolaringizni saqlash va mini\\-darslar\n"
         "📚 *Ovozli lug'at* \\- A1/A2/B1/B2, 20 mavzu, 25 so'z\n"
         "🎭 *Rolli o'yinlar* \\- TELC/Goethe uslubi, 20 mavzu\n\n"
-        "*Bo'limni tanlang:*",
+        "Bo'limni tanlang:",
         parse_mode="MarkdownV2",
         reply_markup=ai_mentor_menu_keyboard(),
     )
