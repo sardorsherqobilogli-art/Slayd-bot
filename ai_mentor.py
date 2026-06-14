@@ -1349,55 +1349,6 @@ async def vorstellen_pdf_new(update: Update, context: ContextTypes.DEFAULT_TYPE)
     return VORSTELLEN_RESULT
 
 
-vorstellen_conv_handler = ConversationHandler(
-    entry_points=[
-        CallbackQueryHandler(vorstellen_menu, pattern="^ai_vorstellen$"),
-        CallbackQueryHandler(vorstellen_menu, pattern="^vorstellen_menu$"),
-    ],
-    states={
-        VORSTELLEN_MENU: [
-            CallbackQueryHandler(vorstellen_start_new, pattern="^vorstellen_start$"),
-            CallbackQueryHandler(vorstellen_rules, pattern="^vorstellen_rules$"),
-            CallbackQueryHandler(vorstellen_templates, pattern="^vorstellen_templates$"),
-            CallbackQueryHandler(vorstellen_template_show, pattern="^vorstellen_template_"),
-        ],
-        VORSTELLEN_PREPARE: [
-            CallbackQueryHandler(vorstellen_start_new, pattern="^vorstellen_go$"),
-            CallbackQueryHandler(vorstellen_templates, pattern="^vorstellen_templates$"),
-        ],
-        VORSTELLEN_Q1: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q2: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q3: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q4: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q5: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q6: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_Q7: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
-        VORSTELLEN_RESULT: [
-            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_tushuntirish$"),
-            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_tarjima$"),
-            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_yaxshilash$"),
-            CallbackQueryHandler(vs_improve_show, pattern="^vorstellen_level_"),
-            CallbackQueryHandler(vs_speak_new, pattern="^vs_speak$"),
-            CallbackQueryHandler(vorstellen_pdf_new, pattern="^vorstellen_pdf$"),
-            CallbackQueryHandler(vorstellen_start_new, pattern="^ai_vorstellen$"),
-        ],
-        VORSTELLEN_IMPROVE: [
-            CallbackQueryHandler(vs_improve_show, pattern="^vorstellen_level_"),
-            CallbackQueryHandler(vs_speak_new, pattern="^vs_speak$"),
-            CallbackQueryHandler(vorstellen_pdf_new, pattern="^vorstellen_pdf$"),
-            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_yaxshilash$"),
-            CallbackQueryHandler(vorstellen_start_new, pattern="^ai_vorstellen$"),
-        ],
-    },
-    fallbacks=[
-        CallbackQueryHandler(vorstellen_menu, pattern="^vorstellen_menu$"),
-        CallbackQueryHandler(ai_mentor_menu_handler, pattern="^ai_mentor_menu$"),
-    ],
-    map_to_parent={
-        VORSTELLEN_MENU: AI_MENTOR_MENU,
-    }
-)
-
 async def erfahrungen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Erfahrungen — faqat B2/C1"""
     query = update.callback_query
@@ -2644,3 +2595,54 @@ vs_speak_handler    = vs_speak_new
 # VORSTELLEN_MENU=107, VORSTELLEN_Q1=109... shu state'larga yo'naltirish
 VORSTELLEN_START    = VORSTELLEN_MENU      # 107 — birinchi savol state
 VORSTELLEN_FOLLOWUP = VORSTELLEN_Q1       # 109 — jarayon davomida
+
+# ==================== CONVERSATION HANDLERS (eng pastda — barcha funksiyalardan keyin) ====================
+
+vorstellen_conv_handler = ConversationHandler(
+    entry_points=[
+        CallbackQueryHandler(vorstellen_menu, pattern="^ai_vorstellen$"),
+        CallbackQueryHandler(vorstellen_menu, pattern="^vorstellen_menu$"),
+    ],
+    states={
+        VORSTELLEN_MENU: [
+            CallbackQueryHandler(vorstellen_start_new, pattern="^vorstellen_start$"),
+            CallbackQueryHandler(vorstellen_rules, pattern="^vorstellen_rules$"),
+            CallbackQueryHandler(vorstellen_templates, pattern="^vorstellen_templates$"),
+            CallbackQueryHandler(vorstellen_template_show, pattern="^vorstellen_template_"),
+        ],
+        VORSTELLEN_PREPARE: [
+            CallbackQueryHandler(vorstellen_start_new, pattern="^vorstellen_go$"),
+            CallbackQueryHandler(vorstellen_templates, pattern="^vorstellen_templates$"),
+        ],
+        VORSTELLEN_Q1: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q2: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q3: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q4: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q5: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q6: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_Q7: [MessageHandler(filters.TEXT | filters.VOICE | filters.AUDIO, vorstellen_process_new)],
+        VORSTELLEN_RESULT: [
+            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_tushuntirish$"),
+            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_tarjima$"),
+            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_yaxshilash$"),
+            CallbackQueryHandler(vs_improve_show, pattern="^vorstellen_level_"),
+            CallbackQueryHandler(vs_speak_new, pattern="^vs_speak$"),
+            CallbackQueryHandler(vorstellen_pdf_new, pattern="^vorstellen_pdf$"),
+            CallbackQueryHandler(vorstellen_start_new, pattern="^ai_vorstellen$"),
+        ],
+        VORSTELLEN_IMPROVE: [
+            CallbackQueryHandler(vs_improve_show, pattern="^vorstellen_level_"),
+            CallbackQueryHandler(vs_speak_new, pattern="^vs_speak$"),
+            CallbackQueryHandler(vorstellen_pdf_new, pattern="^vorstellen_pdf$"),
+            CallbackQueryHandler(vs_show_section_new, pattern="^vs_show_yaxshilash$"),
+            CallbackQueryHandler(vorstellen_start_new, pattern="^ai_vorstellen$"),
+        ],
+    },
+    fallbacks=[
+        CallbackQueryHandler(vorstellen_menu, pattern="^vorstellen_menu$"),
+        CallbackQueryHandler(ai_mentor_menu_handler, pattern="^ai_mentor_menu$"),
+    ],
+    map_to_parent={
+        VORSTELLEN_MENU: AI_MENTOR_MENU,
+    }
+)
