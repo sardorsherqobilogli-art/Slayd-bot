@@ -15,6 +15,7 @@ import logging
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
     ReplyKeyboardMarkup, KeyboardButton, InputFile,
+    WebAppInfo, MenuButtonWebApp,
 )
 from telegram.ext import (
     Application,
@@ -1061,9 +1062,43 @@ def esc_md(text: str) -> str:
 
 # ==================== MAIN ====================
 
+# ==================== MINI APP ====================
+MINI_APP_URL = os.environ.get(
+    "MINI_APP_URL",
+    "https://deutsch-meister-miniapp-production.up.railway.app",
+)
+
+
+async def setup_menu_button(application: Application) -> None:
+    """Bot ishga tushganda, xabar yozish maydonchasi yonidagi
+    doimiy 'Menu' tugmasini Mini App ochadigan qilib sozlaydi."""
+    try:
+        await application.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(
+                text="📱 Mini App",
+                web_app=WebAppInfo(url=MINI_APP_URL),
+            )
+        )
+        logger.info(f"✅ Mini App tugmasi sozlandi: {MINI_APP_URL}")
+    except Exception as e:
+        logger.error(f"❌ Mini App tugmasini sozlashda xato: {e}")
+
+
+async def web_app_data_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Mini App'dan sendData() orqali kelgan ma'lumotni qabul qiladi.
+    Hozircha faqat qabul qilib, tasdiq beradi — kelajakda har bir
+    action turi uchun alohida ishlov qo'shiladi."""
+    raw = update.effective_message.web_app_data.data
+    logger.info(f"📲 Mini App'dan ma'lumot: {raw}")
+    await update.effective_message.reply_text(
+        "✅ Mini App'dan ma'lumot qabul qilindi!",
+        reply_markup=REPLY_KEYBOARD,
+    )
+
+
 def main() -> None:
     """Asosiy ishga tushirish funksiyasi"""
-    application = Application.builder().token(TOKEN).build()
+    application = Application.builder().token(TOKEN).post_init(setup_menu_button).build()
 
     # ==================== CONVERSATION HANDLERS ====================
 
@@ -1304,6 +1339,9 @@ def main() -> None:
     # Handlerlarni qo'shish
     application.add_handler(main_conv)
     application.add_handler(ai_mentor_conv)
+
+    # Mini App'dan kelgan ma'lumot (sendData orqali)
+    application.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, web_app_data_handler))
 
     # Pastki tugmalar handleri (conversation tashqarisida)
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_keyboard_handler))
