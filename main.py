@@ -36,7 +36,7 @@ from database import get_db
 from voice_engine import speak_text, listen_to_voice
 
 # AI Mentor moduli
-from ai_mentor_work import (
+from ai_mentor import (
     AI_MENTOR_MENU,
     ai_mentor_menu_handler,
     level_detect_start, level_detect_process, ld_show_section, ld_speak_handler,
@@ -115,7 +115,7 @@ REPLY_KEYBOARD = ReplyKeyboardMarkup(
     REG_CHANNEL,
     # Admin
     ADMIN_STATE,
-) = range(30)
+) = range(28)
 
 # ==================== ADMIN CONFIG ====================
 ADMIN_IDS = [int(x) for x in os.environ.get("ADMIN_IDS", "0").split(",") if x.strip()]
