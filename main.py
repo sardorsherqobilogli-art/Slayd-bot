@@ -1437,7 +1437,7 @@ def main() -> None:
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
                 MessageHandler(voice_filter, vorstellen_process_new),
             ],
-            VORSTELLEN_FOLLOWUP: reply_keyboard_handlers + common_handlers + [
+            VORSTELLEN_Q1: reply_keyboard_handlers + common_handlers + [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, vorstellen_process_new),
                 MessageHandler(voice_filter, vorstellen_process_new),
             ],
