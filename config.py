@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get("BOT_TOKEN", "SIZNING_BOT_TOKENINGIZ")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_WHISPER_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
 DEFAULT_AI_MODEL = "llama3-70b-8192"
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "deutsch_meister.db")
 
