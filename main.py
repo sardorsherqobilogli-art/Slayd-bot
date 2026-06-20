@@ -40,9 +40,6 @@ from ai_mentor import (
     AI_MENTOR_MENU,
     ai_mentor_menu_handler,
     level_detect_start, level_detect_process, ld_show_section, ld_speak_handler,
-    vorstellen_menu, vorstellen_rules, vorstellen_templates, vorstellen_template_show,
-    vorstellen_start_new, vorstellen_process_new,
-    vs_show_section_new, vs_improve_menu, vs_improve_show, vs_speak_new, vorstellen_pdf_new,
     erfahrungen_menu, erfahrungen_topic, erfahrungen_start_chat, erfahrungen_chat, erfahrungen_result,
     mistake_bank_menu, mistake_list, mistake_mini_lesson, mistake_speak_handler,
     mistake_improve_handler, mistake_practice, mistake_practice_process, mistake_master, mistake_random,
@@ -51,12 +48,17 @@ from ai_mentor import (
     vocab_sprechen_ready, vocab_sprechen_process, vocab_roleplay_from_vocab,
     roleplay_menu, roleplay_level_select, roleplay_topic_select,
     roleplay_start_dialog, roleplay_chat, roleplay_result,
-    VORSTELLEN_START, VORSTELLEN_RESULT, VORSTELLEN_IMPROVE,
     LEVEL_DETECT_Q1, LEVEL_DETECT_Q2, LEVEL_DETECT_Q3, LEVEL_DETECT_Q4, LEVEL_DETECT_Q5,
     ERFAHRUNGEN_MENU, ERFAHRUNGEN_DIFFICULTY, ERFAHRUNGEN_CHAT,
     MISTAKE_BANK_MENU, MISTAKE_MINILESSON, MISTAKE_PRACTICE,
     VOICE_VOCAB_LEVEL, VOICE_VOCAB_TOPIC, VOICE_VOCAB_WORDS, VOICE_VOCAB_TEST, VOICE_VOCAB_SPRECHEN,
     ROLEPLAY_LEVEL, ROLEPLAY_TOPIC, ROLEPLAY_RULES, ROLEPLAY_CHAT,
+)
+
+# Vorstellen moduli (MUKAMMAL VERSIYA — 7 savol, rasm, AI tahlil, PDF)
+from vorstellen import (
+    vorstellen_start, vorstellen_process, vs_show_section, vs_speak_handler,
+    VORSTELLEN_START, VORSTELLEN_FOLLOWUP, VORSTELLEN_RESULT,
 )
 
 # Progress moduli
