@@ -24,6 +24,12 @@ WHISPER_MODEL = "whisper-large-v3"
 DEFAULT_AI_MODEL = "llama3-70b-8192"
 DATABASE_PATH = os.environ.get("DATABASE_PATH", "deutsch_meister.db")
 
+# ==================== TTS VOICES (Edge TTS) ====================
+TTS_VOICES = {
+    "female": "de-DE-KatjaNeural",
+    "male": "de-DE-ConradNeural",
+}
+
 # ==================== XP SYSTEM ====================
 XP_REWARDS = {
     "flashcard_correct": 10,
