@@ -313,13 +313,52 @@ async def ld_speak_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 
 # ==================== VORSTELLEN (O'ZINI TANISHTIRISH) ====================
+# 7 ta Goethe/TELC uslubidagi savol | Matn + Ovoz | AI tahlil | PDF natija
+# Dizayn: Sprechen mit Spass logo + nemis bayrog'i ramkasi (qora/qizil/sariq)
 
-VORSTELLEN_TOPICS = [
-    "ism, yosh va kelib chiqish",
-    "kasb va ta'lim",
-    "qiziqishlar va hobbilar",
-    "oila va do'stlar",
-    "kundalik hayot va reja",
+VORSTELLEN_SAVOLLAR = [
+    {
+        "id": 1,
+        "nemis": "Stellen Sie sich vor! Wie heißen Sie und wie alt sind Sie?",
+        "uzbek": "O'zingizni taqdim eting! Ismingiz va yoshingiz?",
+        "mavzu": "Name und Alter",
+    },
+    {
+        "id": 2,
+        "nemis": "Woher kommen Sie? Erzählen Sie von Ihrem Heimatland.",
+        "uzbek": "Qayerdansiz? Vataningiz haqida gapiring.",
+        "mavzu": "Herkunft / Heimatland",
+    },
+    {
+        "id": 3,
+        "nemis": "Wo wohnen Sie? Beschreiben Sie Ihre Wohnung/Ihr Haus.",
+        "uzbek": "Qayerda yashaysiz? Uy/apartamentingizni tavsiflang.",
+        "mavzu": "Wohnort und Wohnung",
+    },
+    {
+        "id": 4,
+        "nemis": "Erzählen Sie von Ihrer Familie.",
+        "uzbek": "Oilangiz haqida gapiring.",
+        "mavzu": "Familie",
+    },
+    {
+        "id": 5,
+        "nemis": "Wo haben Sie Deutsch gelernt? Wie lange lernen Sie schon?",
+        "uzbek": "Qayerda nemis tilini o'rgandingiz? Qancha vaqtdan beri o'rganasiz?",
+        "mavzu": "Deutsch lernen",
+    },
+    {
+        "id": 6,
+        "nemis": "Was machen Sie? (Studium, Beruf, Schule...)",
+        "uzbek": "Nima ish qilasiz? (O'qish, ish, ta'lim...)",
+        "mavzu": "Studium und Arbeit",
+    },
+    {
+        "id": 7,
+        "nemis": "Welche Sprachen sprechen Sie? Warum lernen Sie Deutsch?",
+        "uzbek": "Qaysi tillarni bilasiz? Nima uchun nemis tilini o'rganasiz?",
+        "mavzu": "Sprachen",
+    },
 ]
 
 VORSTELLEN_EXAMPLES = {
@@ -327,19 +366,21 @@ VORSTELLEN_EXAMPLES = {
     "a2": "Ich heiße [Ism], ich bin [yosh] Jahre alt und komme aus Usbekistan. Ich arbeite als [kasb].",
     "b1": "Mein Name ist [Ism]. Ich bin [yosh] Jahre alt und stamme aus Usbekistan. Beruflich bin ich [kasb] und interessiere mich für [qiziqish].",
     "b2": "Gestatten Sie mir, mich kurz vorzustellen: Ich heiße [Ism], bin [yosh] Jahre alt und komme ursprünglich aus Usbekistan...",
-    "c1": "Darf ich mich vorstellen? Mein Name ist [Ism]. Ich bin gebürtiger Usbeke/Usbeki und lebe seit einigen Jahren in Deutschland...",
 }
 
 VORSTELLEN_RULES_TEXT = (
     "📋 *Vorstellen — qoidalar*\n\n"
-    "O'zingizni nemis tilida tanishtirishda quyidagi tartibga amal qiling:\n\n"
-    "1\\. Ism va familiya \\(*Ich heiße\\.\\.\\.*\\)\n"
-    "2\\. Yosh \\(*Ich bin \\.\\.\\. Jahre alt*\\)\n"
-    "3\\. Kelib chiqish/yashash joyi \\(*Ich komme aus \\.\\.\\.*\\)\n"
-    "4\\. Kasb yoki ta'lim \\(*Ich arbeite als \\.\\.\\. / Ich studiere \\.\\.\\.*\\)\n"
-    "5\\. Qiziqishlar \\(*Meine Hobbys sind \\.\\.\\.*\\)\n"
-    "6\\. Oila haqida \\(ixtiyoriy\\)\n\n"
-    "💡 Gaplar qisqa va aniq bo'lsin\\. Har bir jumla bitta fikrni ifodalasin\\."
+    "Goethe / TELC imtihon uslubida 7 ta savolga javob berasiz:\n\n"
+    "1\\. Ism va yosh\n"
+    "2\\. Qayerdansiz\n"
+    "3\\. Yashash joyingiz\n"
+    "4\\. Oilangiz\n"
+    "5\\. Nemis tilini qayerda o'rgandingiz\n"
+    "6\\. Nima ish qilasiz\n"
+    "7\\. Qaysi tillarni bilasiz\n\n"
+    "⚠️ *Imtihonda 15 soniya tayyorlanish vaqti bor\\!*\n"
+    "Biz sizga shoshilmasdan javob berish imkonini beramiz\\.\n\n"
+    "📝 Matn yozing YOKI 🎙️ ovozli xabar yuboring\\."
 )
 
 
@@ -366,14 +407,13 @@ async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         level = "a1"
 
     context.user_data["vs_level"] = level
-    context.user_data["vs_history"] = []
-    context.user_data["vs_round"] = 0
 
     await query.edit_message_text(
         f"👤 *O'zini Tanishtirish — Vorstellen*\n\n"
         f"📊 Darajangiz: *{level.upper()}*\n\n"
-        f"Bu bo'limda siz nemis tilida o'zingizni tanishtirishni mashq qilasiz\\. "
-        f"AI sizning gaplaringizni tekshirib, maslahat beradi\\.\n\n"
+        f"🎯 *Goethe/TELC imtihon uslubida 7 ta savol\\.*\n"
+        f"Har biriga matn yoki ovoz bilan javob berasiz\\.\n"
+        f"Oxirida AI sizni tahlil qilib, mukammal PDF tayyorlaydi\\!\n\n"
         f"Quyidagilardan birini tanlang\\:",
         parse_mode="MarkdownV2",
         reply_markup=_vorstellen_main_keyboard(),
@@ -437,234 +477,432 @@ async def vorstellen_template_show(update: Update, context: ContextTypes.DEFAULT
 
 
 async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen mashqini boshlash"""
+    """Vorstellen mashqini boshlash — 1-savoldan boshlaydi"""
     query = update.callback_query
     if query:
         await query.answer()
 
     level = context.user_data.get("vs_level", "a1")
-    context.user_data["vs_history"] = []
-    context.user_data["vs_round"] = 0
 
-    example = VORSTELLEN_EXAMPLES.get(level, VORSTELLEN_EXAMPLES["a1"])
-    text = (
-        f"🎤 *Vorstellen mashqi*\n\n"
-        f"📊 Darajangiz\\: *{level.upper()}*\n\n"
-        f"Nemis tilida o'zingizni tanishtiring\\!\n\n"
-        f"💡 *Namuna \\({level.upper()}\\)\\:*\n_{esc_md(example)}_\n\n"
-        f"Endi o'zingiz yozing yoki gapirib yuboring 🎤"
-    )
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_skip_0")],
-        [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
-    ])
+    # Holatni butunlay tozalash
+    context.user_data["vs_answers"] = {}        # {1: {"text":..., "voice": bool}, ...}
+    context.user_data["vs_voice_parts"] = {}     # {1: ["...", "..."], ...} — qisman ovoz qismlari
+    context.user_data["vs_voice_count"] = {}     # {1: 2, ...}
+    context.user_data["vs_current_q"] = 1
+    context.user_data["vs_analysis"] = None
+    context.user_data["vs_level"] = level
 
-    if query:
-        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-    else:
-        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
-
+    await _show_vorstellen_question(query or update.message, context, 1)
     return VORSTELLEN_START
 
 
-async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen jarayonini boshqarish (matn/ovoz va boshqaruv tugmalari)"""
+async def _show_vorstellen_question(obj, context, q_num: int):
+    """q_num — 1..7 savolni ko'rsatadi"""
+    savol = VORSTELLEN_SAVOLLAR[q_num - 1]
+    text = (
+        f"🎤 *Vorstellen — Savol {q_num}/7*\n\n"
+        f"🇩🇪 *{esc_md(savol['nemis'])}*\n\n"
+        f"🇺🇿 _{esc_md(savol['uzbek'])}_\n\n"
+        f"📝 Matn yozing YOKI 🎙️ ovozli xabar yuboring\n"
+        f"_\\(bitta savolga 3 martagacha ovoz yuborishingiz mumkin\\)_"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"vorstellen_skip_{q_num}")],
+        [InlineKeyboardButton("🏁 Yakunlash va tahlil", callback_data="vorstellen_finish")],
+    ])
 
+    if hasattr(obj, "edit_message_text"):
+        try:
+            await obj.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+        except Exception:
+            # Agar edit qilib bo'lmasa (masalan ovoz xabaridan keyin) — yangi xabar
+            chat = obj.message if hasattr(obj, "message") else obj
+            await chat.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    else:
+        await obj.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+
+
+def _merge_voice_parts(context, q_num: int):
+    """Bitta savol uchun to'plangan barcha ovoz qismlarini birlashtiradi"""
+    parts_map = context.user_data.get("vs_voice_parts", {})
+    parts = parts_map.get(q_num, [])
+    if not parts:
+        return
+    full_text = " ".join(parts)
+    answers = context.user_data.setdefault("vs_answers", {})
+    if q_num in answers and answers[q_num].get("text"):
+        answers[q_num]["text"] = answers[q_num]["text"] + " " + full_text
+    else:
+        answers[q_num] = {"text": full_text, "voice": True}
+    parts_map[q_num] = []
+
+
+async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """
+    Vorstellen jarayonini boshqarish:
+    — Matnli javob (har bir savol uchun)
+    — Ovozli javob (har bir savolga 3 martagacha)
+    — Boshqaruv tugmalari: skip, next, finish
+    """
+    current_q = context.user_data.get("vs_current_q", 1)
+
+    # ── CALLBACK TUGMALAR ──────────────────────────────────────────────
     if update.callback_query:
         query = update.callback_query
         await query.answer()
         data = query.data
 
-        if data.startswith("vorstellen_skip_") or data.startswith("vorstellen_next_"):
-            round_num = context.user_data.get("vs_round", 0) + 1
-            context.user_data["vs_round"] = round_num
+        if data.startswith("vorstellen_skip_"):
+            q_num = int(data.split("_")[-1])
+            # Agar shu savol uchun ovoz qismlari bo'lsa — birlashtiramiz, aks holda bo'sh deb belgilaymiz
+            _merge_voice_parts(context, q_num)
+            answers = context.user_data.setdefault("vs_answers", {})
+            if q_num not in answers:
+                answers[q_num] = {"text": "", "voice": False}
 
-            if round_num > len(VORSTELLEN_TOPICS):
+            next_q = q_num + 1
+            context.user_data["vs_current_q"] = next_q
+            if next_q > 7:
                 return await _vorstellen_final_result(query, context)
-
-            topic = VORSTELLEN_TOPICS[round_num - 1]
-            level = context.user_data.get("vs_level", "a1")
-            history = context.user_data.get("vs_history", [])
-
-            await query.edit_message_text("⏳ *AI savol tayyorlamoqda\\.\\.\\.*", parse_mode="MarkdownV2")
-
-            ai_question = await groq_chat([
-                {"role": "system", "content": (
-                    f"Siz nemis tili o'qituvchisisiz. Talaba darajasi: {level.upper()}. "
-                    f"Vorstellen mashqi uchun '{topic}' mavzusida nemis tilida bitta savol bering. "
-                    f"Savoldan keyin o'zbek tilidagi tarjimani qo'shing. Qisqa va aniq savol bering."
-                )},
-                {"role": "user", "content": f"Suhbat tarixi: {json.dumps(history[-4:], ensure_ascii=False)}"},
-            ])
-
-            await query.edit_message_text(
-                f"🗣️ *Savol — {round_num}/{len(VORSTELLEN_TOPICS)}*\n\n"
-                f"🤖 *AI\\:* {esc_md(ai_question)}\n\n"
-                f"Javob yozing yoki gapirib yuboring 🎤",
-                parse_mode="MarkdownV2",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"vorstellen_skip_{round_num}")],
-                    [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
-                ]),
-            )
+            await _show_vorstellen_question(query, context, next_q)
             return VORSTELLEN_START
 
-        elif data == "vorstellen_finish":
+        if data.startswith("vorstellen_next_"):
+            q_num = int(data.split("_")[-1])
+            _merge_voice_parts(context, q_num)
+            next_q = q_num + 1
+            context.user_data["vs_current_q"] = next_q
+            if next_q > 7:
+                return await _vorstellen_final_result(query, context)
+            await _show_vorstellen_question(query, context, next_q)
+            return VORSTELLEN_START
+
+        if data == "vorstellen_finish":
+            _merge_voice_parts(context, current_q)
             return await _vorstellen_final_result(query, context)
 
         return VORSTELLEN_START
 
-    elif update.message:
-        text = update.message.text.strip() if update.message.text else ""
-
-        if not text:
-            await update.message.reply_text("❗ Iltimos matn yuboring yoki ovoz xabarini yuboring.")
+    # ── MATNLI JAVOB ─────────────────────────────────────────────────────
+    if update.message and update.message.text:
+        user_text = update.message.text.strip()
+        if not user_text:
             return VORSTELLEN_START
 
-        history = context.user_data.get("vs_history", [])
-        level = context.user_data.get("vs_level", "a1")
-        round_num = context.user_data.get("vs_round", 0)
+        answers = context.user_data.setdefault("vs_answers", {})
+        answers[current_q] = {"text": user_text, "voice": False}
 
-        history.append({"role": "user", "content": text})
-        context.user_data["vs_history"] = history
+        next_q = current_q + 1
+        context.user_data["vs_current_q"] = next_q
 
-        loading = await update.message.reply_text("⏳ *AI tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
+        if next_q > 7:
+            return await _vorstellen_final_result(update.message, context)
 
-        ai_response = await groq_chat([
-            {"role": "system", "content": (
-                f"Siz nemis tili o'qituvchisisiz. Talaba darajasi: {level.upper()}. "
-                f"Talaba o'zini nemis tilida tanishtirmoqda. "
-                f"1) Xatolarini tuzating (bo'lsa), 2) Yaxshi tomonlarini maqtang, "
-                f"3) Kengaytirish uchun bitta savol bering. "
-                f"O'zbek va nemis tillarida javob bering. Qisqa va ragbatlantiruvchi bo'ling."
-            )},
-            {"role": "user", "content": text},
-        ])
+        await _show_vorstellen_question(update.message, context, next_q)
+        return VORSTELLEN_START
 
-        history.append({"role": "assistant", "content": ai_response})
-        context.user_data["vs_history"] = history
+    # ── OVOZLI JAVOB ─────────────────────────────────────────────────────
+    if update.message and (update.message.voice or update.message.audio):
+        loading = await update.message.reply_text(
+            "🎙️ *Ovoz tahlil qilinmoqda\\.\\.\\.*", parse_mode="MarkdownV2"
+        )
+
+        recognized = await listen_to_voice(update, context, language="de")
 
         try:
             await loading.delete()
         except Exception:
             pass
 
-        next_round = round_num + 1
-        context.user_data["vs_round"] = next_round
+        if not recognized or recognized.startswith("❌"):
+            await update.message.reply_text(
+                "⚠️ Ovozni tushuna olmadim\\. Yana urinib ko'ring yoki matn yozing\\.",
+                parse_mode="MarkdownV2",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"vorstellen_skip_{current_q}")],
+                    [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
+                ]),
+            )
+            return VORSTELLEN_START
 
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➡️ Keyingi savol", callback_data=f"vorstellen_next_{next_round}")],
-            [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
-        ])
+        # Ovoz sanog'i va qismlarini saqlash
+        vc = context.user_data.setdefault("vs_voice_count", {})
+        count = vc.get(current_q, 0) + 1
+        vc[current_q] = count
 
-        await update.message.reply_text(
-            f"🤖 *AI Mentor\\:*\n\n{esc_md(ai_response)}",
-            parse_mode="MarkdownV2",
-            reply_markup=keyboard,
+        parts_map = context.user_data.setdefault("vs_voice_parts", {})
+        parts_map.setdefault(current_q, []).append(recognized)
+
+        remaining = max(0, 3 - count)
+        preview = recognized[:120] + ("…" if len(recognized) > 120 else "")
+        hint = (
+            f"🎙️ Yana {remaining} marta ovoz yuborishingiz mumkin, "
+            f"yoki pastdagi tugma bilan davom eting\\."
+            if remaining > 0 else
+            "🎙️ 3 ta ovoz to'ldi\\. Endi davom eting\\."
         )
 
-        try:
-            from database import get_db
-            db = get_db()
-            db.add_xp(update.effective_user.id, 15, "vorstellen", text[:50])
-        except Exception:
-            pass
-
+        # Mavjud main.py pattern'lariga mos: faqat skip_/next_/finish ishlatiladi
+        await update.message.reply_text(
+            f"✅ *Ovoz qabul qilindi\\! \\({count}/3\\)*\n\n"
+            f"_{esc_md(preview)}_\n\n"
+            f"{hint}",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("➡️ Keyingi savol", callback_data=f"vorstellen_next_{current_q}")],
+                [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
+            ]),
+        )
         return VORSTELLEN_START
 
     return VORSTELLEN_START
 
 
-async def _vorstellen_final_result(query, context):
-    """Vorstellen yakuniy natijasi"""
-    history = context.user_data.get("vs_history", [])
+async def _vorstellen_final_result(obj, context):
+    """
+    Barcha javoblarni AI orqali tahlil qiladi va natija sahifasini ko'rsatadi.
+    obj — CallbackQuery yoki Message bo'lishi mumkin.
+    """
+    # Qolgan ovoz qismlarini ham birlashtirib qo'yamiz
+    for q in range(1, 8):
+        _merge_voice_parts(context, q)
+
+    answers = context.user_data.get("vs_answers", {})
     level = context.user_data.get("vs_level", "a1")
 
-    if not history:
-        await query.edit_message_text(
-            "⚠️ Hech narsa yozilmadi. Qayta urinib ko'ring!",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 Qayta boshlash", callback_data="ai_vorstellen")],
-                [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
-            ]),
-        )
-        return VORSTELLEN_RESULT
+    answered_nums = [q for q, a in answers.items() if a.get("text", "").strip()]
+    missed = [q for q in range(1, 8) if q not in answered_nums]
+    score = len(answered_nums)
 
-    user_texts = [m["content"] for m in history if m["role"] == "user"]
-    combined = " ".join(user_texts)
-    context.user_data["vs_combined_text"] = combined
+    loading_text = (
+        "🧠 *AI tahlil qilmoqda\\.\\.\\.*\n\n"
+        "• Grammatika tekshirilmoqda\n"
+        "• So'z boyligi baholanmoqda\n"
+        "• Daraja aniqlanmoqda\n\n"
+        "_10\\-15 soniya kuting\\.\\.\\._"
+    )
 
-    await query.edit_message_text("⏳ *Yakuniy tahlil tayyorlanmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
+    is_query = hasattr(obj, "edit_message_text")
+    if is_query:
+        await obj.edit_message_text(loading_text, parse_mode="MarkdownV2")
+    else:
+        await obj.reply_text(loading_text, parse_mode="MarkdownV2")
 
-    final_eval = await groq_chat([
-        {"role": "system", "content": (
-            f"Siz nemis tili imtihon tekshiruvchisisiz. Talaba darajasi: {level.upper()}. "
-            f"Talabaning butun vorstellen mashqini baholang. "
-            f"Format:\n"
-            f"⭐ BAL: [1-10]\n"
-            f"✅ YAXSHI: [2-3 narsa]\n"
-            f"❌ XATOLAR: [asosiy xatolar]\n"
-            f"💡 MASLAHAT: [keyingi mashq uchun]"
-        )},
-        {"role": "user", "content": f"Talabaning yozganlari:\n{combined}"},
-    ])
-    context.user_data["vs_final_eval"] = final_eval
+    all_text = "\n".join([
+        f"{q}. {VORSTELLEN_SAVOLLAR[q-1]['mavzu']}: {answers[q]['text']}"
+        for q in sorted(answered_nums)
+    ]) or "Foydalanuvchi hech qanday javob bermadi."
+
+    analysis = await _groq_json_vorstellen(all_text, missed, level)
+    context.user_data["vs_analysis"] = analysis
+    context.user_data["vs_missed"] = missed
+    context.user_data["vs_score"] = score
+    context.user_data["vs_answers_text"] = all_text
+
+    # XP va xatolarni saqlash
+    try:
+        from database import get_db
+        db = get_db()
+        user_id = obj.from_user.id if is_query else context._user_id_workaround if False else None
+    except Exception:
+        db = None
 
     try:
         from database import get_db
         db = get_db()
-        db.add_xp(query.from_user.id, 50, "vorstellen_complete", "Vorstellen yakunlandi")
-    except Exception:
-        pass
+        user_id = (obj.from_user.id if is_query else obj.chat.id)
+        xp = XP_REWARDS.get("vorstellen", 30) + score * 5
+        db.add_xp(user_id, xp, "vorstellen", f"Ball: {score}/7")
+        for err in analysis.get("grammar_errors", [])[:5]:
+            if err.get("xato") and err.get("togri"):
+                db.add_mistake(
+                    user_id=user_id,
+                    user_input=err["xato"],
+                    correct_form=err["togri"],
+                    mistake_type="vorstellen_grammar",
+                )
+    except Exception as e:
+        logger.warning(f"Vorstellen DB xatosi: {e}")
 
-    await query.edit_message_text(
-        f"🎉 *Vorstellen Yakunlandi\\!*\n\n"
-        f"{esc_md(final_eval)}\n\n"
-        f"🎁 *\\+50 XP* qo'shildi\\!",
-        parse_mode="MarkdownV2",
-        reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("📄 Bo'limlarni ko'rish", callback_data="vs_show_full")],
-            [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
-            [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
-            [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
-            [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
-            [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
-        ]),
+    if is_query:
+        return await _show_vorstellen_result_page(obj, context)
+    else:
+        return await _show_vorstellen_result_page(obj, context, as_message=True)
+
+
+async def _groq_json_vorstellen(all_text: str, missed: list, level: str) -> dict:
+    """Groq orqali JSON formatda Vorstellen tahlili oladi"""
+    if not GROQ_API_KEY:
+        return {"error": "AI xizmati mavjud emas"}
+
+    system_prompt = (
+        "Siz nemis tili mutaxassisisiz. Foydalanuvchi Vorstellen (o'zini taqdim etish) "
+        "savollariga javob berdi. Javoblarni tahlil qiling va FAQAT quyidagi JSON "
+        "formatida javob bering — boshqa hech narsa yozmang:\n"
+        "{\n"
+        '  "grammar_score": 1-10,\n'
+        '  "vocabulary_score": 1-10,\n'
+        '  "fluency_score": 1-10,\n'
+        '  "detected_level": "A1 yoki A2 yoki B1 yoki B2",\n'
+        '  "tushuntirish": "Xatolar va grammatika haqida o\'zbek tilida tushuntirish (3-5 gap)",\n'
+        '  "tarjima": "Foydalanuvchi javoblarining to\'g\'ri nemischa varianti (hammasi birlashtirilgan, ravon matn)",\n'
+        '  "yaxshilash_a1": "A1 darajasida to\'liq mukammal Vorstellen matni (7 mavzu yoritilgan)",\n'
+        '  "yaxshilash_a2": "A2 darajasida to\'liq mukammal variant",\n'
+        '  "yaxshilash_b1": "B1 darajasida to\'liq mukammal variant",\n'
+        '  "yaxshilash_b2": "B2 darajasida to\'liq mukammal variant",\n'
+        '  "grammar_errors": [{"xato": "...", "togri": "..."}],\n'
+        '  "good_points": ["...", "...", "..."]\n'
+        "}"
     )
+    try:
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": GROQ_MODEL,
+                    "max_tokens": 3000,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": (
+                            f"Foydalanuvchi javoblari:\n{all_text}\n\n"
+                            f"Qoldirilgan savollar: {missed if missed else 'yo\u02bbq'}\n"
+                            f"Foydalanuvchining hozirgi darajasi: {level.upper()}"
+                        )},
+                    ],
+                    "response_format": {"type": "json_object"},
+                },
+            )
+            data = resp.json()
+            raw = data["choices"][0]["message"]["content"]
+            return json.loads(raw)
+    except Exception as e:
+        logger.error(f"Vorstellen Groq JSON xatosi: {e}")
+        return {"error": str(e)}
+
+
+VORSTELLEN_YULDUZ_IZOH = {
+    7: "Mukammal! Barcha bo'limlar yoritilgan.",
+    6: "Yaxshi! 1 ta bo'lim yetishmayapti.",
+    5: "O'rta. 2 ta bo'lim qoldirilgan.",
+    4: "Qoniqarli. 3 ta bo'lim yetishmayapti.",
+    3: "Kam. 4 ta bo'lim qoldirilgan.",
+    2: "Juda kam. 5 ta bo'lim yetishmayapti.",
+    1: "Juda zaif. 6 ta bo'lim qoldirilgan.",
+    0: "Hech qanday javob yo'q.",
+}
+
+
+async def _show_vorstellen_result_page(obj, context, as_message: bool = False):
+    """Natija sahifasini ko'rsatadi (yulduz, ball, tugmalar)"""
+    analysis = context.user_data.get("vs_analysis", {}) or {}
+    score = context.user_data.get("vs_score", 0)
+    missed = context.user_data.get("vs_missed", [])
+
+    stars = "⭐" * score + "☆" * (7 - score)
+    izoh = VORSTELLEN_YULDUZ_IZOH.get(score, "")
+    level_detected = analysis.get("detected_level", "?")
+
+    text = (
+        f"🎉 *Vorstellen Natijasi*\n\n"
+        f"{esc_md(stars)}\n"
+        f"_{esc_md(izoh)}_\n\n"
+        f"📊 *Ball: {score}/7*\n"
+        f"📚 Grammatika: {analysis.get('grammar_score', '?')}/10\n"
+        f"🗣️ So'z boyligi: {analysis.get('vocabulary_score', '?')}/10\n"
+        f"💬 Ravonlik: {analysis.get('fluency_score', '?')}/10\n\n"
+        f"🎯 *Aniqlangan daraja: {esc_md(str(level_detected))}*\n\n"
+    )
+
+    if missed:
+        missed_str = ", ".join(map(str, missed))
+        text += f"⚠️ *Qoldirilgan savollar: {esc_md(missed_str)}*\n\n"
+
+    good = analysis.get("good_points", [])
+    if good:
+        text += "✅ *Yaxshi jihatlar:*\n"
+        for g in good[:3]:
+            text += f"• {esc_md(g)}\n"
+        text += "\n"
+
+    text += "🎁 *XP qo'shildi\\!*\n\nQuyidagi tugmalardan birini tanlang\\:"
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("💡 Tushuntirish", callback_data="vs_show_tushuntirish"),
+            InlineKeyboardButton("🌐 Tarjima", callback_data="vs_show_tarjima"),
+        ],
+        [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
+        [InlineKeyboardButton("📑 PDF yuklash", callback_data="vorstellen_pdf")],
+        [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
+        [InlineKeyboardButton("🔄 Qayta boshlash", callback_data="ai_vorstellen")],
+        [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
+    ])
+
+    if as_message:
+        await obj.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    else:
+        await obj.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+
     return VORSTELLEN_RESULT
 
 
 async def vs_show_section_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Natija bo'limlarini ko'rsatish"""
+    """Tushuntirish / Tarjima bo'limlarini ko'rsatish"""
     query = update.callback_query
     await query.answer()
 
-    section = query.data.replace("vs_show_", "")
+    analysis = context.user_data.get("vs_analysis", {}) or {}
+    data = query.data
 
-    if section == "yaxshilash":
-        final_eval = context.user_data.get("vs_final_eval", "")
-        await query.edit_message_text(
-            f"🎉 *Vorstellen natijasi*\n\n{esc_md(final_eval)}",
-            parse_mode="MarkdownV2",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("📄 Bo'limlarni ko'rish", callback_data="vs_show_full")],
-                [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
-                [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
-                [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
-                [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
-            ]),
-        )
-        return VORSTELLEN_RESULT
+    if data == "vs_show_tushuntirish":
+        title = "💡 *Tushuntirish*"
+        content = analysis.get("tushuntirish", "Ma'lumot yo'q.")
+        errors = analysis.get("grammar_errors", [])
+        extra = ""
+        if errors:
+            extra = "\n\n📋 *Xatolar:*\n"
+            for e in errors[:5]:
+                extra += f"❌ {esc_md(e.get('xato',''))}  →  ✅ {esc_md(e.get('togri',''))}\n"
+        body = f"{title}\n\n{esc_md(content)}{extra}"
 
-    final_eval = context.user_data.get("vs_final_eval", "Natija topilmadi.")
+    elif data == "vs_show_tarjima":
+        title = "🌐 *To'g'ri nemischa variant*"
+        content = analysis.get("tarjima", "Ma'lumot yo'q.")
+        body = f"{title}\n\n{esc_md(content)}"
+
+    elif data == "vs_show_back":
+        # "Natijaga qaytish" — vs_show_ patterni orqali ushlanadi
+        return await _show_vorstellen_result_page(query, context)
+
+    else:
+        return await vs_improve_menu(update, context)
+
     await query.edit_message_text(
-        f"📄 *To'liq natija*\n\n{esc_md(final_eval)}",
+        body,
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Orqaga", callback_data="vs_show_yaxshilash")],
+            [
+                InlineKeyboardButton("💡 Tushuntirish", callback_data="vs_show_tushuntirish"),
+                InlineKeyboardButton("🌐 Tarjima", callback_data="vs_show_tarjima"),
+            ],
+            [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
+            [InlineKeyboardButton("📑 PDF yuklash", callback_data="vorstellen_pdf")],
+            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
+            [InlineKeyboardButton("↩️ Natijaga qaytish", callback_data="vs_show_back")],
         ]),
     )
     return VORSTELLEN_RESULT
+
+
+async def vs_back_to_result(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Natija sahifasiga qaytish"""
+    query = update.callback_query
+    await query.answer()
+    return await _show_vorstellen_result_page(query, context)
 
 
 async def vs_improve_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -676,10 +914,16 @@ async def vs_improve_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         [InlineKeyboardButton(level.upper(), callback_data=f"vorstellen_level_{level}")]
         for level in VORSTELLEN_EXAMPLES.keys()
     ]
-    buttons.append([InlineKeyboardButton("🔙 Orqaga", callback_data="vs_show_yaxshilash")])
+    buttons.append([InlineKeyboardButton("↩️ Natijaga qaytish", callback_data="vs_show_back")])
 
     await query.edit_message_text(
-        "✨ *Yaxshilangan variant*\n\nQaysi daraja darajasida yaxshilangan matn kerak\\?",
+        "✨ *Yaxshilash — daraja tanlang*\n\n"
+        "AI sizning javoblaringizni tanlangan darajada mukammallashtiradi:\n\n"
+        "🟢 *A1* — Oddiy, qisqa gaplar\n"
+        "🟢 *A2* — O'rta, birikmalar bilan\n"
+        "🟡 *B1* — Murakkab, tushuntirishlar\n"
+        "🟡 *B2* — Professional, to'liq variant\n\n"
+        "*Darajangizni tanlang:*",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup(buttons),
     )
@@ -687,40 +931,45 @@ async def vs_improve_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def vs_improve_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Tanlangan daraja uchun yaxshilangan matnni AI orqali tuzish"""
+    """Tanlangan darajada mukammal variantni ko'rsatish (AI dan oldindan kelgan yoki yangi so'raladi)"""
     query = update.callback_query
     await query.answer()
 
     level = query.data.replace("vorstellen_level_", "")
-    combined = context.user_data.get("vs_combined_text", "")
+    analysis = context.user_data.get("vs_analysis", {}) or {}
+    improved = analysis.get(f"yaxshilash_{level}", "")
 
-    if not combined:
+    if not improved:
+        all_text = context.user_data.get("vs_answers_text", "")
         await query.edit_message_text(
-            "⚠️ Avval Vorstellen mashqini bajaring.",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
-            ]),
+            f"✨ *{level.upper()} darajasida mukammallashtirilyapti\\.\\.\\.*",
+            parse_mode="MarkdownV2",
         )
-        return VORSTELLEN_RESULT
+        improved = await groq_chat([
+            {"role": "system", "content": (
+                f"Siz nemis tili o'qituvchisisiz. Foydalanuvchi javoblarini {level.upper()} "
+                f"darajasida mukammallashtiring. FAQAT ravon nemischa Vorstellen matni yozing "
+                f"(name/alter, herkunft, wohnort, familie, deutsch lernen, studium/arbeit, "
+                f"sprachen mavzularini yoritib bering)."
+            )},
+            {"role": "user", "content": f"Javoblarni {level.upper()} darajasida mukammallashtir:\n{all_text}"},
+        ], max_tokens=1200)
+        analysis[f"yaxshilash_{level}"] = improved
+        context.user_data["vs_analysis"] = analysis
 
-    await query.edit_message_text("⏳ *Yaxshilangan variant tayyorlanmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
-
-    improved = await groq_chat([
-        {"role": "system", "content": (
-            f"Siz nemis tili o'qituvchisisiz. Quyidagi talaba matnini {level.upper()} darajasiga mos "
-            f"to'g'ri va tabiiy nemis tiliga qayta yozing. Faqat yaxshilangan nemis matnini bering, "
-            f"so'ngra qisqa o'zbekcha izoh qo'shing."
-        )},
-        {"role": "user", "content": combined},
-    ])
+    context.user_data["vs_improved_text"] = improved
+    context.user_data["vs_improved_level"] = level
 
     await query.edit_message_text(
-        f"✨ *Yaxshilangan variant \\({level.upper()}\\)*\n\n{esc_md(improved)}",
+        f"✨ *{level.upper()} darajasida mukammal variant:*\n\n"
+        f"{esc_md(improved)}\n\n"
+        f"💡 _Bu matnni yodlang va ovozda mashq qiling\\!_",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
-            [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
-            [InlineKeyboardButton("🔙 Boshqa daraja", callback_data="vs_show_yaxshilash")],
+            [InlineKeyboardButton("📑 PDF yuklash", callback_data="vorstellen_pdf")],
+            [InlineKeyboardButton("🔊 Ovozda eshitish", callback_data="vs_speak")],
+            [InlineKeyboardButton("🔄 Boshqa daraja", callback_data="vs_show_yaxshilash")],
+            [InlineKeyboardButton("↩️ Natijaga qaytish", callback_data="vs_show_back")],
             [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
         ]),
     )
@@ -728,34 +977,313 @@ async def vs_improve_show(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def vs_speak_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Natijani ovozli o'qish (Edge TTS orqali)"""
+    """Natijani ovozli o'qish (Edge TTS orqali) — yaxshilangan matn ustuvor"""
     query = update.callback_query
-    await query.answer()
+    await query.answer("🔊 Ovoz tayyorlanmoqda...")
 
-    text = context.user_data.get("vs_final_eval") or context.user_data.get("vs_combined_text") or ""
+    text = (
+        context.user_data.get("vs_improved_text")
+        or (context.user_data.get("vs_analysis", {}) or {}).get("tarjima")
+        or ""
+    )
+
     if not text:
-        await query.answer("⚠️ O'qish uchun matn topilmadi.", show_alert=True)
+        await query.answer(
+            "⚠️ O'qiladigan matn yo'q. Avval 'Yaxshilash' yoki 'Tarjima' ni bosing.",
+            show_alert=True,
+        )
         return VORSTELLEN_RESULT
 
     try:
-        from voice_engine import speak_text
-        await speak_text(update, text[:500])
+        await speak_text(update, text[:600])
     except Exception as e:
         logger.error(f"vs_speak_new xato: {e}")
-        await query.answer("🔊 Ovoz funksiyasi hozircha ishlamadi.", show_alert=True)
+        await query.answer("🔊 Ovoz funksiyasida xato yuz berdi.", show_alert=True)
 
-    return context.user_data.get("vs_last_state", VORSTELLEN_RESULT)
+    return VORSTELLEN_RESULT
 
 
 async def vorstellen_pdf_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """PDF eksport — hozircha vaqtincha to'xtatilgan, keyinroq rivojlantiriladi"""
+    """
+    PDF eksport — Sprechen mit Spass dizaynida (qora/qizil/sariq ramka + logo)
+    Yaxshilangan matn bo'lsa o'shani, bo'lmasa to'g'ri tarjimani PDF qiladi.
+    """
     query = update.callback_query
-    await query.answer(
-        "📑 PDF eksport funksiyasi hali tayyor emas — tez kunda qo'shiladi!",
-        show_alert=True,
+    await query.answer("📑 PDF tayyorlanmoqda...")
+
+    analysis = context.user_data.get("vs_analysis", {}) or {}
+    score = context.user_data.get("vs_score", 0)
+    answers_text = context.user_data.get("vs_answers_text", "")
+
+    level = context.user_data.get("vs_improved_level") or analysis.get("detected_level", "A1")
+    level = str(level).lower()[:2] if level else "a1"
+
+    improved_text = (
+        context.user_data.get("vs_improved_text")
+        or analysis.get(f"yaxshilash_{level}")
+        or analysis.get("tarjima")
+        or "Mukammal variant mavjud emas."
+    )
+
+    try:
+        pdf_bytes = build_vorstellen_pdf(
+            level=level.upper(),
+            score=score,
+            grammar_score=analysis.get("grammar_score", "?"),
+            vocab_score=analysis.get("vocabulary_score", "?"),
+            fluency_score=analysis.get("fluency_score", "?"),
+            detected_level=analysis.get("detected_level", "?"),
+            user_answers=answers_text,
+            improved_text=improved_text,
+        )
+    except Exception as e:
+        logger.error(f"PDF yaratishda xato: {e}")
+        pdf_bytes = None
+
+    if not pdf_bytes:
+        await query.message.reply_text(
+            "❌ PDF yaratishda xato yuz berdi\\. Iltimos qayta urinib ko'ring\\.",
+            parse_mode="MarkdownV2",
+        )
+        return VORSTELLEN_RESULT
+
+    from io import BytesIO
+    buf = BytesIO(pdf_bytes)
+    buf.seek(0)
+    user_id = query.from_user.id
+    filename = f"Vorstellen_{level.upper()}_{user_id}.pdf"
+
+    await query.message.reply_document(
+        document=buf,
+        filename=filename,
+        caption=(
+            f"✅ *Vorstellen — {esc_md(level.upper())} daraja*\n\n"
+            f"📑 PDF fayl tayyor\\!\n"
+            f"⭐ Ball: {score}/7\n\n"
+            f"💡 Bu matnni yodlang va har kuni mashq qiling\\!\n\n"
+            f"📚 @sprechenmitspass"
+        ),
+        parse_mode="MarkdownV2",
     )
     return VORSTELLEN_RESULT
 
+
+def build_vorstellen_pdf(level, score, grammar_score, vocab_score, fluency_score,
+                          detected_level, user_answers, improved_text) -> bytes | None:
+    """
+    Sprechen mit Spass dizaynidagi PDF:
+    — Nemis bayrog'i ramkasi (qora/qizil/sariq)
+    — Logo yuqorida markazda
+    — Barcha matn ramka ichida, A4 format
+    """
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import cm
+        from reportlab.lib import colors
+        from reportlab.lib.styles import ParagraphStyle
+        from reportlab.lib.enums import TA_CENTER
+        from reportlab.platypus import (
+            Paragraph, Spacer, Table, TableStyle, HRFlowable,
+            Frame, BaseDocTemplate, PageTemplate as PT,
+        )
+        from reportlab.pdfgen import canvas as rl_canvas
+        import io
+        import os
+
+        BLACK = colors.HexColor("#000000")
+        RED   = colors.HexColor("#CC0000")
+        GOLD  = colors.HexColor("#E8A33D")
+        DARK  = colors.HexColor("#1a1a1a")
+        LGRAY = colors.HexColor("#F7F7F7")
+        IVORY = colors.HexColor("#FAF9F6")
+
+        PAGE_W, PAGE_H = A4
+        FRAME_MARGIN = 0.6 * cm   # bayroq ramkasining qalinligi
+        INNER_PAD    = 0.9 * cm   # ramka ichidan matngacha bo'sh joy
+
+        logo_path = os.path.join(os.path.dirname(__file__), "logo_sprechen.png")
+        if not os.path.exists(logo_path):
+            logo_path = None
+
+        buf = io.BytesIO()
+
+        def draw_frame_border(c, page_w, page_h):
+            """Nemis bayrog'i uslubidagi 3 qatlamli ramka: sariq tashqi, qizil o'rta, qora ichki"""
+            # Tashqi — sariq
+            c.setStrokeColor(GOLD)
+            c.setLineWidth(14)
+            c.rect(7, 7, page_w - 14, page_h - 14, fill=0, stroke=1)
+            # O'rta — qizil
+            c.setStrokeColor(RED)
+            c.setLineWidth(7)
+            c.rect(16, 16, page_w - 32, page_h - 32, fill=0, stroke=1)
+            # Ichki — qora
+            c.setStrokeColor(BLACK)
+            c.setLineWidth(2.5)
+            c.rect(24, 24, page_w - 48, page_h - 48, fill=0, stroke=1)
+            # Fon — och kremrang
+            c.setFillColor(IVORY)
+            c.rect(28, 28, page_w - 56, page_h - 56, fill=1, stroke=0)
+
+        def header_height():
+            return 4.2 * cm
+
+        class VorstellenPDF(BaseDocTemplate):
+            def __init__(self, filename, **kw):
+                super().__init__(filename, **kw)
+                content_top = PAGE_H - FRAME_MARGIN - INNER_PAD - header_height()
+                frame = Frame(
+                    FRAME_MARGIN + INNER_PAD,
+                    FRAME_MARGIN + INNER_PAD,
+                    PAGE_W - 2 * (FRAME_MARGIN + INNER_PAD),
+                    content_top - (FRAME_MARGIN + INNER_PAD),
+                    leftPadding=0, rightPadding=0, topPadding=0, bottomPadding=0,
+                    id="main",
+                )
+                self.addPageTemplates(PT("p1", [frame], onPage=self._on_page))
+
+            def _on_page(self, c, doc):
+                draw_frame_border(c, PAGE_W, PAGE_H)
+
+                # Logo — markazda yuqorida
+                logo_size = 2.6 * cm
+                logo_x = (PAGE_W - logo_size) / 2
+                logo_y = PAGE_H - FRAME_MARGIN - INNER_PAD - logo_size + 0.3*cm
+                if logo_path:
+                    try:
+                        c.drawImage(
+                            logo_path, logo_x, logo_y,
+                            width=logo_size, height=logo_size,
+                            mask="auto", preserveAspectRatio=True,
+                        )
+                    except Exception:
+                        pass
+
+                # Sarlavha — logo ostida markazda
+                title_y = logo_y - 0.55*cm
+                c.setFont("Helvetica-Bold", 16)
+                c.setFillColor(DARK)
+                c.drawCentredString(PAGE_W / 2, title_y, "SPRECHEN MIT SPASS")
+
+                c.setFont("Helvetica-Bold", 11)
+                c.setFillColor(RED)
+                c.drawCentredString(PAGE_W / 2, title_y - 0.45*cm, "VORSTELLEN — Mukammal Natija")
+
+                # Daraja badji — chap yuqori burchak
+                badge_w, badge_h = 2.1*cm, 0.85*cm
+                bx = FRAME_MARGIN + INNER_PAD
+                by = PAGE_H - FRAME_MARGIN - INNER_PAD - badge_h + 0.2*cm
+                c.setFillColor(RED)
+                c.roundRect(bx, by, badge_w, badge_h, 4, fill=1, stroke=0)
+                c.setFillColor(colors.white)
+                c.setFont("Helvetica-Bold", 14)
+                c.drawCentredString(bx + badge_w/2, by + 0.27*cm, str(level))
+
+                # Yulduz badji — o'ng yuqori burchak
+                ex = PAGE_W - FRAME_MARGIN - INNER_PAD - badge_w
+                c.setFillColor(GOLD)
+                c.roundRect(ex, by, badge_w, badge_h, 4, fill=1, stroke=0)
+                c.setFillColor(DARK)
+                c.setFont("Helvetica-Bold", 12)
+                c.drawCentredString(ex + badge_w/2, by + 0.27*cm, f"{score}/7")
+
+                # Ajratuvchi chiziq
+                sep_y = title_y - 0.85*cm
+                c.setStrokeColor(GOLD)
+                c.setLineWidth(1.5)
+                c.line(FRAME_MARGIN + INNER_PAD, sep_y, PAGE_W - FRAME_MARGIN - INNER_PAD, sep_y)
+
+        # ── STYLES ──
+        head_style = ParagraphStyle(
+            "Head", fontName="Helvetica-Bold", fontSize=12,
+            textColor=RED, spaceBefore=10, spaceAfter=5, leading=15,
+        )
+        body_style = ParagraphStyle(
+            "Body", fontName="Helvetica", fontSize=9.5,
+            textColor=DARK, leading=14, spaceAfter=3,
+        )
+        german_style = ParagraphStyle(
+            "German", fontName="Helvetica-Oblique", fontSize=10,
+            textColor=BLACK, leading=16, spaceAfter=3,
+        )
+        footer_style = ParagraphStyle(
+            "Footer", fontName="Helvetica", fontSize=7.5,
+            textColor=colors.HexColor("#666666"), alignment=TA_CENTER, spaceBefore=6,
+        )
+
+        story = []
+
+        # Ball jadvali
+        table_data = [
+            ["Ko'rsatkich", "Ball", "Ko'rsatkich", "Ball"],
+            ["Grammatika", f"{grammar_score}/10", "So'z boyligi", f"{vocab_score}/10"],
+            ["Ravonlik", f"{fluency_score}/10", "Aniqlangan daraja", str(detected_level)],
+        ]
+        col_w = (PAGE_W - 2*(FRAME_MARGIN + INNER_PAD)) / 4
+        tbl = Table(table_data, colWidths=[col_w*1.3, col_w*0.7, col_w*1.3, col_w*0.7])
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,0), BLACK),
+            ("TEXTCOLOR", (0,0), (-1,0), colors.white),
+            ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+            ("FONTSIZE", (0,0), (-1,0), 8.5),
+            ("ALIGN", (0,0), (-1,-1), "CENTER"),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("FONTNAME", (0,1), (-1,-1), "Helvetica"),
+            ("FONTSIZE", (0,1), (-1,-1), 9),
+            ("ROWBACKGROUNDS", (0,1), (-1,-1), [LGRAY, colors.white]),
+            ("GRID", (0,0), (-1,-1), 0.4, colors.HexColor("#BBBBBB")),
+            ("TOPPADDING", (0,0), (-1,-1), 5),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 5),
+        ]))
+        story.append(tbl)
+        story.append(Spacer(1, 0.35*cm))
+
+        story.append(Paragraph("📝 SIZNING JAVOBLARINGIZ", head_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=GOLD))
+        story.append(Spacer(1, 0.12*cm))
+        for line in (user_answers or "Javoblar yo'q.").split("\n"):
+            if line.strip():
+                story.append(Paragraph(line.strip(), body_style))
+        story.append(Spacer(1, 0.3*cm))
+
+        story.append(Paragraph(f"✨ MUKAMMAL VARIANT ({level} DARAJASI)", head_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=GOLD))
+        story.append(Spacer(1, 0.12*cm))
+        for para in (improved_text or "").split(". "):
+            p = para.strip()
+            if p:
+                if not p.endswith("."):
+                    p += "."
+                story.append(Paragraph(p, german_style))
+        story.append(Spacer(1, 0.3*cm))
+
+        story.append(Paragraph("💡 MASLAHATLAR", head_style))
+        story.append(HRFlowable(width="100%", thickness=1, color=GOLD))
+        story.append(Spacer(1, 0.1*cm))
+        tips = [
+            "Bu matnni yodlang va har kuni ovozda mashq qiling.",
+            "Har kuni 5 marta takrorlang — muskul xotirasi hosil bo'ladi.",
+            "Ovozingizni yozib, tinglang va taqqoslang.",
+            "Imtihonda 15 soniya tayyorlanish vaqtingiz bor — tez o'ylang!",
+            "7 ta bo'limning barchasini yoritishga harakat qiling.",
+        ]
+        for i, t in enumerate(tips, 1):
+            story.append(Paragraph(f"{i}. {t}", body_style))
+
+        story.append(Spacer(1, 0.4*cm))
+        story.append(HRFlowable(width="100%", thickness=1.5, color=RED))
+        story.append(Paragraph("@sprechenmitspass  |  t.me/sprechenmitspass  |  Deutsch Meister Pro", footer_style))
+
+        doc = VorstellenPDF(buf, pagesize=A4)
+        doc.build(story)
+        return buf.getvalue()
+
+    except ImportError as e:
+        logger.warning(f"reportlab import xatosi: {e}")
+        return None
+    except Exception as e:
+        logger.error(f"PDF qurishda xato: {e}")
+        return None
 
 
 # ==================== ERFAHRUNGEN (TAJRIBA SUHBATI) ====================
