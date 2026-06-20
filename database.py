@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 DEUTSCH MEISTER PRO - SQLite Ma'lumotlar Bazasi
-Foydalanuvchilar, xatolar, progress, kunlik vazifalar
+YANGILANGAN VERSION - Lug'at, Sayfa, Kitob Materiallar jadvallari bilan
 """
 
 import sqlite3
@@ -59,735 +59,429 @@ class Database:
                     speaking_score REAL DEFAULT 0.0,
                     current_lektion INTEGER DEFAULT 1,
                     total_conversations INTEGER DEFAULT 0,
-                    total_flashcards INTEGER DEFAULT 0,
-                    total_pomodoro_minutes INTEGER DEFAULT 0,
-                    words_learned INTEGER DEFAULT 0,
-                    phone TEXT DEFAULT NULL
+                    phone TEXT,
+                    channel_subscribed INTEGER DEFAULT 0
                 )
             """)
 
-
-            # Phone ustunini qo'shish (agar mavjud bo'lmasa)
-            try:
-                cursor.execute("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT NULL")
-            except Exception:
-                pass  # Ustun allaqachon mavjud
-            # 2. Xatolar banki (har bir xato + mini-dars)
+            # 2. Xatolar jadvali
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS mistakes (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    user_input TEXT NOT NULL,
-                    correct_form TEXT NOT NULL,
-                    mistake_type TEXT NOT NULL,
-                    grammar_rule TEXT,
+                    user_input TEXT,
+                    correct_form TEXT,
+                    mistake_type TEXT,
                     mini_lesson TEXT,
-                    practice_exercises TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    reviewed_count INTEGER DEFAULT 0,
-                    last_reviewed TEXT,
-                    is_mastered INTEGER DEFAULT 0,
+                    reviewed_at TEXT,
+                    mastered INTEGER DEFAULT 0,
+                    review_count INTEGER DEFAULT 0,
                     FOREIGN KEY (user_id) REFERENCES users(user_id)
                 )
             """)
 
-            # 3. Kunlik vazifalar
+            # 3. Progress jadvali
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS daily_missions (
+                CREATE TABLE IF NOT EXISTS progress (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    date TEXT NOT NULL,
-                    mission_type TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    target_count INTEGER DEFAULT 1,
-                    current_count INTEGER DEFAULT 0,
-                    xp_reward INTEGER DEFAULT 50,
-                    is_completed INTEGER DEFAULT 0,
-                    completed_at TEXT,
+                    xp_amount INTEGER,
+                    activity_type TEXT,
+                    activity_detail TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id)
                 )
             """)
 
-            # 4. Speaking bali (har bir suhbatdan keyin)
+            # 4. Kunlik so'zlar jadvali
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS speaking_scores (
+                CREATE TABLE IF NOT EXISTS daily_words (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER,
-                    session_type TEXT NOT NULL,
+                    german TEXT,
+                    uzbek TEXT,
+                    izoh TEXT,
+                    misol TEXT,
+                    sinonimlar TEXT,
+                    date TEXT,
+                    learned INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                )
+            """)
+
+            # 5. Suhbatlar tarixi
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS conversations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER,
                     topic TEXT,
-                    score REAL NOT NULL,
-                    feedback TEXT,
-                    words_used TEXT,
-                    grammar_errors TEXT,
-                    duration_seconds INTEGER,
+                    messages TEXT,
+                    score INTEGER,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(user_id)
                 )
             """)
 
-            # 5. Lektsiya progressi
+            # ==================== YANGI JADVALLAR ====================
+
+            # 6. Lug'at kitoblari
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS lektion_progress (
+                CREATE TABLE IF NOT EXISTS lugat_books (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
                     level TEXT NOT NULL,
-                    book TEXT NOT NULL,
-                    lektion_number INTEGER NOT NULL,
-                    is_completed INTEGER DEFAULT 0,
-                    flashcard_score REAL DEFAULT 0,
-                    words_learned INTEGER DEFAULT 0,
-                    completed_at TEXT,
-                    UNIQUE(user_id, level, book, lektion_number)
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 )
             """)
 
-            # 6. XP tarixi (level up va barcha XP o'zgarishlari)
+            # 7. Lug'at bo'limlari (chapters)
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS xp_history (
+                CREATE TABLE IF NOT EXISTS lugat_chapters (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    amount INTEGER NOT NULL,
-                    reason TEXT NOT NULL,
-                    details TEXT,
+                    book_id INTEGER,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    order_num INTEGER DEFAULT 0,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    FOREIGN KEY (book_id) REFERENCES lugat_books(id)
                 )
             """)
 
-            # 7. Voice vocab practice (ovozli lug'at mashqlari)
+            # 8. Lug'at so'zlari
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS voice_practice (
+                CREATE TABLE IF NOT EXISTS lugat_words (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    german_word TEXT NOT NULL,
-                    user_pronunciation TEXT,
-                    accuracy_score REAL DEFAULT 0,
-                    feedback TEXT,
-                    practiced_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
-                )
-            """)
-
-            # 8. AI suhbatlari tarixi (Kontext AI uchun)
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS conversation_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER,
-                    session_type TEXT NOT NULL,
-                    topic TEXT,
-                    messages TEXT NOT NULL,
-                    words_learned_today TEXT,
+                    chapter_id INTEGER,
+                    german TEXT NOT NULL,
+                    uzbek TEXT NOT NULL,
+                    izoh TEXT,
+                    sinonimlar TEXT,
+                    order_num INTEGER DEFAULT 0,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users(user_id)
+                    FOREIGN KEY (chapter_id) REFERENCES lugat_chapters(id)
                 )
             """)
 
-            logger.info("✅ Ma'lumotlar bazasi jadvallari tayyor!")
+            # 9. Sayfa materiallari
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS sayfa_materials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    book_key TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    pdf_path TEXT,
+                    audio_path TEXT,
+                    order_num INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 10. Kitob materiallari (Kitob Materiallar bo'limi)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS kitob_books (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    level TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    author TEXT,
+                    cover_image TEXT,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+
+            # 11. Kitob materiallari fayllari
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS kitob_materials (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    book_id INTEGER,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    file_path TEXT NOT NULL,
+                    type TEXT DEFAULT 'pdf',
+                    order_num INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (book_id) REFERENCES kitob_books(id)
+                )
+            """)
+
+            conn.commit()
+            logger.info("Barcha jadvallar yaratildi!")
 
     # ==================== USERS ====================
 
-    def get_or_create_user(self, user_id: int, **kwargs) -> Dict[str, Any]:
-        """Foydalanuvchini olish yoki yaratish"""
+    def get_or_create_user(self, user_id: int, username=None, first_name=None, last_name=None):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+            user = cursor.fetchone()
+
+            if not user:
+                cursor.execute("""
+                    INSERT INTO users (user_id, username, first_name, last_name, last_active)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (user_id, username, first_name, last_name, datetime.datetime.now().isoformat()))
+                conn.commit()
+                cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
+                user = cursor.fetchone()
+            else:
+                cursor.execute("UPDATE users SET last_active = ? WHERE user_id = ?",
+                               (datetime.datetime.now().isoformat(), user_id))
+                conn.commit()
+
+            return dict(user) if user else {}
+
+    def update_user(self, user_id: int, **kwargs):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            for key, value in kwargs.items():
+                cursor.execute(f"UPDATE users SET {key} = ? WHERE user_id = ?", (value, user_id))
+            conn.commit()
+
+    def get_user(self, user_id: int):
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
             row = cursor.fetchone()
+            return dict(row) if row else {}
 
-            if row:
-                # Mavjud user - faqat last_active ni yangilash
-                cursor.execute(
-                    "UPDATE users SET last_active = ? WHERE user_id = ?",
-                    (datetime.datetime.now().isoformat(), user_id)
-                )
-                return dict(row)
+    # ==================== XP ====================
 
-            # Yangi user yaratish
-            cursor.execute("""
-                INSERT INTO users (user_id, username, first_name, last_name, last_active)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                user_id,
-                kwargs.get("username", ""),
-                kwargs.get("first_name", ""),
-                kwargs.get("last_name", ""),
-                datetime.datetime.now().isoformat(),
-            ))
-
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-            return dict(cursor.fetchone())
-
-    def update_user(self, user_id: int, **fields) -> bool:
-        """Foydalanuvchi ma'lumotlarini yangilash"""
-        allowed = [
-            "current_level", "target_level", "voice_preference", "tts_speed",
-            "show_mistakes", "ai_difficulty", "speaking_score", "current_lektion",
-            "total_conversations", "total_flashcards", "total_pomodoro_minutes",
-            "words_learned", "streak_days", "total_xp",
-        ]
-        updates = {k: v for k, v in fields.items() if k in allowed}
-        if not updates:
-            return False
-
+    def add_xp(self, user_id: int, amount: int, activity_type: str, detail: str = ""):
         with self._connect() as conn:
             cursor = conn.cursor()
-            set_clause = ", ".join([f"{k} = ?" for k in updates.keys()])
-            values = list(updates.values()) + [user_id]
-            cursor.execute(f"UPDATE users SET {set_clause} WHERE user_id = ?", values)
-            return cursor.rowcount > 0
+            cursor.execute("INSERT INTO progress (user_id, xp_amount, activity_type, activity_detail) VALUES (?, ?, ?, ?)",
+                           (user_id, amount, activity_type, detail))
+            cursor.execute("UPDATE users SET total_xp = total_xp + ? WHERE user_id = ?", (amount, user_id))
+            conn.commit()
 
-    def get_user_stats(self, user_id: int) -> Dict[str, Any]:
-        """Foydalanuvchi statistikasi"""
+    def get_total_xp(self, user_id: int) -> int:
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-            user = cursor.fetchone()
-            if not user:
-                return {}
-
-            stats = dict(user)
-
-            # Xatolar soni
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM mistakes WHERE user_id = ? AND is_mastered = 0",
-                (user_id,)
-            )
-            stats["active_mistakes"] = cursor.fetchone()["count"]
-
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM mistakes WHERE user_id = ? AND is_mastered = 1",
-                (user_id,)
-            )
-            stats["mastered_mistakes"] = cursor.fetchone()["count"]
-
-            # Kunlik vazifalar
-            today = datetime.datetime.now().strftime("%Y-%m-%d")
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM daily_missions WHERE user_id = ? AND date = ? AND is_completed = 1",
-                (user_id, today)
-            )
-            stats["completed_missions_today"] = cursor.fetchone()["count"]
-
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM daily_missions WHERE user_id = ? AND date = ?",
-                (user_id, today)
-            )
-            stats["total_missions_today"] = cursor.fetchone()["count"]
-
-            # Lektsiya progressi
-            cursor.execute(
-                "SELECT COUNT(*) as count FROM lektion_progress WHERE user_id = ? AND is_completed = 1",
-                (user_id,)
-            )
-            stats["completed_lektions"] = cursor.fetchone()["count"]
-
-            return stats
-
-    # ==================== XP SYSTEM ====================
-
-    def add_xp(self, user_id: int, amount: int, reason: str, details: str = "") -> int:
-        """XP qo'shish va tarixga yozish"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-
-            # XP qo'shish
-            cursor.execute(
-                "UPDATE users SET total_xp = total_xp + ? WHERE user_id = ?",
-                (amount, user_id)
-            )
-
-            # Tarixga yozish
-            cursor.execute("""
-                INSERT INTO xp_history (user_id, amount, reason, details, created_at)
-                VALUES (?, ?, ?, ?, ?)
-            """, (user_id, amount, reason, details, datetime.datetime.now().isoformat()))
-
-            # Yangi total_xp ni olish
             cursor.execute("SELECT total_xp FROM users WHERE user_id = ?", (user_id,))
-            new_total = cursor.fetchone()["total_xp"]
-            return new_total
-
-    def get_xp_history(self, user_id: int, days: int = 7) -> List[Dict]:
-        """So'nggi N kunlik XP tarixi"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            since = (datetime.datetime.now() - datetime.timedelta(days=days)).isoformat()
-            cursor.execute("""
-                SELECT * FROM xp_history
-                WHERE user_id = ? AND created_at > ?
-                ORDER BY created_at DESC
-            """, (user_id, since))
-            return [dict(row) for row in cursor.fetchall()]
-
-    def check_level_up(self, user_id: int) -> Optional[str]:
-        """Daraja o'tish mumkinligini tekshirish, yangi darajani qaytaradi yoki None"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-            user = cursor.fetchone()
-            if not user:
-                return None
-
-            current_level = user["current_level"]
-            total_xp = user["total_xp"]
-            speaking_score = user["speaking_score"]
-
-            # Keyingi darajani aniqlash
-            level_order = ["a1", "a2", "b1", "b2", "c1"]
-            try:
-                current_idx = level_order.index(current_level)
-                if current_idx >= len(level_order) - 1:
-                    return None  # C1 - eng yuqori daraja
-                next_level = level_order[current_idx + 1]
-            except ValueError:
-                return None
-
-            reqs = LEVEL_REQUIREMENTS.get(next_level)
-            if not reqs:
-                return None
-
-            # Shartlarni tekshirish
-            if total_xp >= reqs["xp"] and speaking_score >= reqs["speaking_score"]:
-                return next_level
-            return None
-
-    def level_up(self, user_id: int, new_level: str) -> bool:
-        """Darajani oshirish"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE users SET current_level = ? WHERE user_id = ?",
-                (new_level, user_id)
-            )
-            # Level up bonus XP
-            self.add_xp(user_id, XP_REWARDS["level_up_bonus"], "level_up", f"{new_level} darajasiga o'tish")
-            return cursor.rowcount > 0
+            row = cursor.fetchone()
+            return row[0] if row else 0
 
     # ==================== MISTAKES ====================
 
-    def add_mistake(self, user_id: int, user_input: str, correct_form: str,
-                    mistake_type: str, grammar_rule: str = "",
-                    mini_lesson: str = "", practice_exercises: str = "") -> int:
-        """Xatoni saqlash"""
+    def add_mistake(self, user_id: int, user_input: str, correct_form: str, mistake_type: str):
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO mistakes (user_id, user_input, correct_form, mistake_type,
-                                     grammar_rule, mini_lesson, practice_exercises, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, user_input, correct_form, mistake_type, grammar_rule,
-                  mini_lesson, practice_exercises, datetime.datetime.now().isoformat()))
-            return cursor.lastrowid
+                INSERT INTO mistakes (user_id, user_input, correct_form, mistake_type)
+                VALUES (?, ?, ?, ?)
+            """, (user_id, user_input, correct_form, mistake_type))
+            conn.commit()
 
-    def get_mistakes(self, user_id: int, mastered: bool = False, limit: int = 10) -> List[Dict]:
-        """Foydalanuvchi xatolarini olish"""
+    def get_mistakes(self, user_id: int, mastered: bool = False, limit: int = 10):
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT * FROM mistakes
-                WHERE user_id = ? AND is_mastered = ?
-                ORDER BY created_at DESC
-                LIMIT ?
+                SELECT * FROM mistakes WHERE user_id = ? AND mastered = ? ORDER BY created_at DESC LIMIT ?
             """, (user_id, 1 if mastered else 0, limit))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_mistake_by_id(self, mistake_id: int) -> Optional[Dict]:
-        """ID bo'yicha xatoni olish"""
+    def get_mistake_by_id(self, mistake_id: int):
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM mistakes WHERE id = ?", (mistake_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
-    def review_mistake(self, mistake_id: int) -> bool:
-        """Xatoni ko'rib chiqish (review count +1)"""
+    def get_mistake_stats(self, user_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM mistakes WHERE user_id = ? AND mastered = 0", (user_id,))
+            active = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM mistakes WHERE user_id = ? AND mastered = 1", (user_id,))
+            mastered = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM mistakes WHERE user_id = ?", (user_id,))
+            total = cursor.fetchone()[0]
+            return {"active": active, "mastered": mastered, "total": total}
+
+    def master_mistake(self, mistake_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE mistakes SET mastered = 1, reviewed_at = ? WHERE id = ?",
+                           (datetime.datetime.now().isoformat(), mistake_id))
+            conn.commit()
+
+    def review_mistake(self, mistake_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE mistakes SET review_count = review_count + 1, reviewed_at = ? WHERE id = ?",
+                           (datetime.datetime.now().isoformat(), mistake_id))
+            conn.commit()
+
+    # ==================== DAILY WORDS ====================
+
+    def get_daily_word(self, user_id: int):
+        today = datetime.date.today().isoformat()
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM daily_words WHERE user_id = ? AND date = ?", (user_id, today))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def save_daily_word(self, user_id: int, word: dict):
+        today = datetime.date.today().isoformat()
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE mistakes
-                SET reviewed_count = reviewed_count + 1,
-                    last_reviewed = ?
-                WHERE id = ?
-            """, (datetime.datetime.now().isoformat(), mistake_id))
-            return cursor.rowcount > 0
+                INSERT INTO daily_words (user_id, german, uzbek, izoh, misol, sinonimlar, date)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (user_id, word.get("german", ""), word.get("uzbek", ""),
+                  word.get("izoh", ""), word.get("misol", ""),
+                  json.dumps(word.get("sinonimlar", [])), today))
+            conn.commit()
 
-    def master_mistake(self, mistake_id: int) -> bool:
-        """Xatoni o'zlashtirilgan deb belgilash"""
+    # ==================== LUG'AT BOOKS ====================
+
+    def add_lugat_book(self, level: str, name: str, description: str = "") -> int:
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE mistakes SET is_mastered = 1 WHERE id = ?",
-                (mistake_id,)
-            )
-            return cursor.rowcount > 0
-
-    def get_mistake_stats(self, user_id: int) -> Dict[str, int]:
-        """Xatolar statistikasi"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT COUNT(*) as c FROM mistakes WHERE user_id = ? AND is_mastered = 0",
-                (user_id,)
-            )
-            active = cursor.fetchone()["c"]
-            cursor.execute(
-                "SELECT COUNT(*) as c FROM mistakes WHERE user_id = ? AND is_mastered = 1",
-                (user_id,)
-            )
-            mastered = cursor.fetchone()["c"]
-            return {"active": active, "mastered": mastered, "total": active + mastered}
-
-    # ==================== DAILY MISSIONS ====================
-
-    def generate_daily_missions(self, user_id: int) -> List[Dict]:
-        """Kunlik vazifalarni yaratish"""
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-
-        with self._connect() as conn:
-            cursor = conn.cursor()
-
-            # Bugun allaqachon yaratilganmi?
-            cursor.execute(
-                "SELECT COUNT(*) as c FROM daily_missions WHERE user_id = ? AND date = ?",
-                (user_id, today)
-            )
-            if cursor.fetchone()["c"] > 0:
-                return self.get_today_missions(user_id)
-
-            # User statistikasini olish
-            stats = self.get_user_stats(user_id)
-            level = stats.get("current_level", "a1")
-
-            missions = []
-
-            # 1. Flashcard vazifasi
-            missions.append({
-                "user_id": user_id,
-                "date": today,
-                "mission_type": "flashcard",
-                "description": f"📚 {level.upper()} darajasidan 10 ta flashcard yodlang",
-                "target_count": 10,
-                "xp_reward": XP_REWARDS["flashcard_correct"] * 10,
-            })
-
-            # 2. AI suhbat vazifasi
-            missions.append({
-                "user_id": user_id,
-                "date": today,
-                "mission_type": "ai_conversation",
-                "description": "🤖 AI Mentor bilan 1 ta suhbat o'tkazing",
-                "target_count": 1,
-                "xp_reward": XP_REWARDS["ai_conversation"],
-            })
-
-            # 3. Xatoni tuzatish (agar xatolar bo'lsa)
-            if stats.get("active_mistakes", 0) > 0:
-                missions.append({
-                    "user_id": user_id,
-                    "date": today,
-                    "mission_type": "mistake_review",
-                    "description": f"🔧 {stats['active_mistakes']} ta xatoni ko'rib chiqing",
-                    "target_count": min(stats["active_mistakes"], 3),
-                    "xp_reward": XP_REWARDS["mistake_corrected"] * 3,
-                })
-
-            # 4. Pomodoro vazifasi
-            missions.append({
-                "user_id": user_id,
-                "date": today,
-                "mission_type": "pomodoro",
-                "description": "🍅 1 ta Pomodoro (25 daqiqa) o'tkazing",
-                "target_count": 1,
-                "xp_reward": XP_REWARDS["pomodoro_25min"],
-            })
-
-            # Vazifalarni saqlash
-            for m in missions:
-                cursor.execute("""
-                    INSERT INTO daily_missions (user_id, date, mission_type, description, target_count, xp_reward)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (m["user_id"], m["date"], m["mission_type"], m["description"],
-                      m["target_count"], m["xp_reward"]))
-
-            return self.get_today_missions(user_id)
-
-    def get_today_missions(self, user_id: int) -> List[Dict]:
-        """Bugungi vazifalarni olish"""
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM daily_missions
-                WHERE user_id = ? AND date = ?
-                ORDER BY id
-            """, (user_id, today))
-            return [dict(row) for row in cursor.fetchall()]
-
-    def update_mission_progress(self, user_id: int, mission_type: str, increment: int = 1) -> Optional[Dict]:
-        """Vazifa progressini yangilash"""
-        today = datetime.datetime.now().strftime("%Y-%m-%d")
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM daily_missions
-                WHERE user_id = ? AND date = ? AND mission_type = ?
-            """, (user_id, today, mission_type))
-            mission = cursor.fetchone()
-            if not mission:
-                return None
-
-            new_count = mission["current_count"] + increment
-            is_completed = 1 if new_count >= mission["target_count"] else 0
-
-            cursor.execute("""
-                UPDATE daily_missions
-                SET current_count = ?,
-                    is_completed = ?,
-                    completed_at = CASE WHEN ? >= target_count THEN ? ELSE completed_at END
-                WHERE id = ?
-            """, (new_count, is_completed, new_count,
-                  datetime.datetime.now().isoformat() if is_completed else None,
-                  mission["id"]))
-
-            # Agar bajarilgan bo'lsa, XP berish
-            if is_completed and not mission["is_completed"]:
-                self.add_xp(user_id, mission["xp_reward"], "daily_mission", mission_type)
-
-            return dict(cursor.execute("SELECT * FROM daily_missions WHERE id = ?", (mission["id"],)).fetchone())
-
-    # ==================== SPEAKING SCORES ====================
-
-    def add_speaking_score(self, user_id: int, session_type: str, topic: str,
-                           score: float, feedback: str = "", words_used: str = "",
-                           grammar_errors: str = "", duration_seconds: int = 0) -> int:
-        """Speaking balini saqlash"""
-        with self._connect() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO speaking_scores (user_id, session_type, topic, score, feedback,
-                                            words_used, grammar_errors, duration_seconds, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (user_id, session_type, topic, score, feedback, words_used,
-                  grammar_errors, duration_seconds, datetime.datetime.now().isoformat()))
-
-            # O'rtacha speaking score ni yangilash
-            cursor.execute("""
-                SELECT AVG(score) as avg_score FROM speaking_scores
-                WHERE user_id = ?
-            """, (user_id,))
-            avg_score = cursor.fetchone()["avg_score"] or 0
-            cursor.execute(
-                "UPDATE users SET speaking_score = ? WHERE user_id = ?",
-                (round(avg_score, 1), user_id)
-            )
-
+            cursor.execute("INSERT INTO lugat_books (level, name, description) VALUES (?, ?, ?)",
+                           (level, name, description))
+            conn.commit()
             return cursor.lastrowid
 
-    def get_speaking_history(self, user_id: int, limit: int = 10) -> List[Dict]:
-        """Speaking tarixi"""
+    def get_lugat_books(self, level: str):
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM speaking_scores WHERE user_id = ?
-                ORDER BY created_at DESC LIMIT ?
-            """, (user_id, limit))
+            cursor.execute("SELECT * FROM lugat_books WHERE level = ? ORDER BY id", (level,))
             return [dict(row) for row in cursor.fetchall()]
 
-    # ==================== LEKTION PROGRESS ====================
-
-    def update_lektion_progress(self, user_id: int, level: str, book: str,
-                                 lektion_number: int, flashcard_score: float = 0,
-                                 words_learned: int = 0) -> bool:
-        """Lektsiya progressini yangilash"""
+    def get_lugat_book_by_id(self, book_id: int):
         with self._connect() as conn:
             cursor = conn.cursor()
+            cursor.execute("SELECT * FROM lugat_books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
-            cursor.execute("""
-                SELECT * FROM lektion_progress
-                WHERE user_id = ? AND level = ? AND book = ? AND lektion_number = ?
-            """, (user_id, level, book, lektion_number))
-            existing = cursor.fetchone()
+    # ==================== LUG'AT CHAPTERS ====================
 
-            if existing:
-                cursor.execute("""
-                    UPDATE lektion_progress
-                    SET flashcard_score = MAX(flashcard_score, ?),
-                        words_learned = MAX(words_learned, ?)
-                    WHERE id = ?
-                """, (flashcard_score, words_learned, existing["id"]))
-            else:
-                cursor.execute("""
-                    INSERT INTO lektion_progress (user_id, level, book, lektion_number, flashcard_score, words_learned)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (user_id, level, book, lektion_number, flashcard_score, words_learned))
-            return True
-
-    def complete_lektion(self, user_id: int, level: str, book: str, lektion_number: int) -> bool:
-        """Lektsiyani bajarilgan deb belgilash"""
+    def add_lugat_chapter(self, book_id: int, name: str, description: str = "", order_num: int = 0) -> int:
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE lektion_progress
-                SET is_completed = 1, completed_at = ?
-                WHERE user_id = ? AND level = ? AND book = ? AND lektion_number = ?
-            """, (datetime.datetime.now().isoformat(), user_id, level, book, lektion_number))
+            cursor.execute("INSERT INTO lugat_chapters (book_id, name, description, order_num) VALUES (?, ?, ?, ?)",
+                           (book_id, name, description, order_num))
+            conn.commit()
+            return cursor.lastrowid
 
-            if cursor.rowcount == 0:
-                cursor.execute("""
-                    INSERT INTO lektion_progress (user_id, level, book, lektion_number, is_completed, completed_at)
-                    VALUES (?, ?, ?, ?, 1, ?)
-                """, (user_id, level, book, lektion_number, datetime.datetime.now().isoformat()))
-            return True
-
-    def get_lektion_progress(self, user_id: int, level: str, book: str) -> List[Dict]:
-        """Lektsiya progressi ro'yxati"""
+    def get_lugat_chapters(self, book_id: int):
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM lektion_progress
-                WHERE user_id = ? AND level = ? AND book = ?
-                ORDER BY lektion_number
-            """, (user_id, level, book))
+            cursor.execute("SELECT * FROM lugat_chapters WHERE book_id = ? ORDER BY order_num", (book_id,))
             return [dict(row) for row in cursor.fetchall()]
 
-    # ==================== VOICE PRACTICE ====================
+    def get_lugat_chapter_by_id(self, chapter_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM lugat_chapters WHERE id = ?", (chapter_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
-    def add_voice_practice(self, user_id: int, german_word: str,
-                           user_pronunciation: str = "", accuracy_score: float = 0,
-                           feedback: str = "") -> int:
-        """Ovozli mashqni saqlash"""
+    # ==================== LUG'AT WORDS ====================
+
+    def add_lugat_word(self, chapter_id: int, german: str, uzbek: str, izoh: str = "", sinonimlar: str = "", order_num: int = 0):
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO voice_practice (user_id, german_word, user_pronunciation, accuracy_score, feedback, practiced_at)
+                INSERT INTO lugat_words (chapter_id, german, uzbek, izoh, sinonimlar, order_num)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, german_word, user_pronunciation, accuracy_score, feedback,
-                  datetime.datetime.now().isoformat()))
-            return cursor.lastrowid
+            """, (chapter_id, german, uzbek, izoh, sinonimlar, order_num))
+            conn.commit()
 
-    def get_voice_practice_history(self, user_id: int, limit: int = 20) -> List[Dict]:
-        """Ovozli mashqlar tarixi"""
+    def get_lugat_words(self, chapter_id: int):
         with self._connect() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM voice_practice WHERE user_id = ?
-                ORDER BY practiced_at DESC LIMIT ?
-            """, (user_id, limit))
+            cursor.execute("SELECT * FROM lugat_words WHERE chapter_id = ? ORDER BY order_num", (chapter_id,))
             return [dict(row) for row in cursor.fetchall()]
 
-    # ==================== CONVERSATION HISTORY ====================
+    # ==================== SAYFA MATERIALS ====================
 
-    def save_conversation(self, user_id: int, session_type: str, topic: str,
-                          messages: List[Dict], words_learned_today: List[str] = None) -> int:
-        """AI suhbatini saqlash"""
+    def add_sayfa_material(self, book_key: str, name: str, description: str = "", pdf_path: str = "", audio_path: str = "", order_num: int = 0) -> int:
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO conversation_history (user_id, session_type, topic, messages, words_learned_today, created_at)
+                INSERT INTO sayfa_materials (book_key, name, description, pdf_path, audio_path, order_num)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (user_id, session_type, topic, json.dumps(messages),
-                  json.dumps(words_learned_today or []), datetime.datetime.now().isoformat()))
-
-            # total_conversations ni yangilash
-            cursor.execute(
-                "UPDATE users SET total_conversations = total_conversations + 1 WHERE user_id = ?",
-                (user_id,)
-            )
+            """, (book_key, name, description, pdf_path, audio_path, order_num))
+            conn.commit()
             return cursor.lastrowid
 
-    def get_recent_conversations(self, user_id: int, limit: int = 5) -> List[Dict]:
-        """So'nggi suhbatlar"""
+    def get_sayfa_materials(self, book_key: str):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM sayfa_materials WHERE book_key = ? ORDER BY order_num", (book_key,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_sayfa_material_by_id(self, mat_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM sayfa_materials WHERE id = ?", (mat_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # ==================== KITOB BOOKS ====================
+
+    def add_kitob_book(self, level: str, name: str, description: str = "", author: str = "", cover_image: str = "") -> int:
         with self._connect() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT * FROM conversation_history WHERE user_id = ?
-                ORDER BY created_at DESC LIMIT ?
-            """, (user_id, limit))
-            rows = cursor.fetchall()
-            result = []
-            for row in rows:
-                d = dict(row)
-                d["messages"] = json.loads(d["messages"])
-                d["words_learned_today"] = json.loads(d["words_learned_today"]) if d["words_learned_today"] else []
-                result.append(d)
-            return result
+                INSERT INTO kitob_books (level, name, description, author, cover_image)
+                VALUES (?, ?, ?, ?, ?)
+            """, (level, name, description, author, cover_image))
+            conn.commit()
+            return cursor.lastrowid
 
-    def get_words_learned_recent(self, user_id: int, days: int = 7) -> List[str]:
-        """So'nggi N kunda o'rganilgan so'zlar"""
+    def get_kitob_books(self, level: str):
         with self._connect() as conn:
             cursor = conn.cursor()
-            since = (datetime.datetime.now() - datetime.timedelta(days=days)).isoformat()
+            cursor.execute("SELECT * FROM kitob_books WHERE level = ? ORDER BY id", (level,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_kitob_book_by_id(self, book_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM kitob_books WHERE id = ?", (book_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    # ==================== KITOB MATERIALS ====================
+
+    def add_kitob_material(self, book_id: int, name: str, file_path: str, description: str = "", type: str = "pdf", order_num: int = 0) -> int:
+        with self._connect() as conn:
+            cursor = conn.cursor()
             cursor.execute("""
-                SELECT words_learned_today FROM conversation_history
-                WHERE user_id = ? AND created_at > ?
-            """, (user_id, since))
-            all_words = []
-            for row in cursor.fetchall():
-                if row["words_learned_today"]:
-                    all_words.extend(json.loads(row["words_learned_today"]))
-            return list(set(all_words))
+                INSERT INTO kitob_materials (book_id, name, description, file_path, type, order_num)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (book_id, name, description, file_path, type, order_num))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_kitob_materials(self, book_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM kitob_materials WHERE book_id = ? ORDER BY order_num", (book_id,))
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_kitob_material_by_id(self, mat_id: int):
+        with self._connect() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM kitob_materials WHERE id = ?", (mat_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
 
-    def update_user_phone(self, user_id: int, phone: str) -> bool:
-        """Telefon raqamini saqlash"""
-        try:
-            with self._connect() as conn:
-                conn.execute(
-                    "UPDATE users SET phone = ? WHERE user_id = ?",
-                    (phone, user_id)
-                )
-            return True
-        except Exception as e:
-            logger.error(f"update_user_phone xato: {e}")
-            return False
-
-    def get_user_count(self) -> int:
-        """Jami foydalanuvchilar soni"""
-        try:
-            with self._connect() as conn:
-                row = conn.execute("SELECT COUNT(*) FROM users").fetchone()
-                return row[0] if row else 0
-        except Exception as e:
-            logger.error(f"get_user_count xato: {e}")
-            return 0
-
-    def get_all_users_for_admin(self) -> list:
-        """Admin uchun barcha foydalanuvchilar"""
-        try:
-            with self._connect() as conn:
-                rows = conn.execute(
-                    "SELECT user_id, username, first_name, last_name, phone, current_level, total_xp "
-                    "FROM users ORDER BY created_at DESC"
-                ).fetchall()
-                cols = ["user_id", "username", "first_name", "last_name", "phone", "current_level", "total_xp"]
-                return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
-            logger.error(f"get_all_users_for_admin xato: {e}")
-            return []
-
-    def search_by_phone(self, phone_query: str) -> list:
-        """Telefon raqami bo'yicha qidirish"""
-        try:
-            with self._connect() as conn:
-                rows = conn.execute(
-                    "SELECT user_id, username, first_name, last_name, phone, current_level "
-                    "FROM users WHERE phone LIKE ?",
-                    (f"%{phone_query}%",)
-                ).fetchall()
-                cols = ["user_id", "username", "first_name", "last_name", "phone", "current_level"]
-                return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
-            logger.error(f"search_by_phone xato: {e}")
-            return []
-
-
-
-# Global database instance
-_db: Database | None = None
-
+# Singleton
+_db_instance = None
 
 def get_db() -> Database:
-    """Global ma'lumotlar bazasi obyekti (singleton)"""
-    global _db
-    if _db is None:
-        _db = Database()
-    return _db
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = Database()
+    return _db_instance
