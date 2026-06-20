@@ -71,10 +71,9 @@ LEVEL_DETECT_Q5 = 114
 LEVEL_DETECT_RESULT = 115
 
 # Vorstellen (O'zini tanishtirish)
-VORSTELLEN_MENU = 120
-VORSTELLEN_Q1 = 121
-VORSTELLEN_FOLLOWUP = 122
+VORSTELLEN_START = 120
 VORSTELLEN_RESULT = 123
+VORSTELLEN_IMPROVE = 124
 
 # Erfahrungen (Tajriba suhbati)
 ERFAHRUNGEN_MENU = 130
@@ -331,9 +330,30 @@ VORSTELLEN_EXAMPLES = {
     "c1": "Darf ich mich vorstellen? Mein Name ist [Ism]. Ich bin gebürtiger Usbeke/Usbeki und lebe seit einigen Jahren in Deutschland...",
 }
 
+VORSTELLEN_RULES_TEXT = (
+    "📋 *Vorstellen — qoidalar*\n\n"
+    "O'zingizni nemis tilida tanishtirishda quyidagi tartibga amal qiling:\n\n"
+    "1\\. Ism va familiya \\(*Ich heiße\\.\\.\\.*\\)\n"
+    "2\\. Yosh \\(*Ich bin \\.\\.\\. Jahre alt*\\)\n"
+    "3\\. Kelib chiqish/yashash joyi \\(*Ich komme aus \\.\\.\\.*\\)\n"
+    "4\\. Kasb yoki ta'lim \\(*Ich arbeite als \\.\\.\\. / Ich studiere \\.\\.\\.*\\)\n"
+    "5\\. Qiziqishlar \\(*Meine Hobbys sind \\.\\.\\.*\\)\n"
+    "6\\. Oila haqida \\(ixtiyoriy\\)\n\n"
+    "💡 Gaplar qisqa va aniq bo'lsin\\. Har bir jumla bitta fikrni ifodalasin\\."
+)
 
-async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen modulini boshlash"""
+
+def _vorstellen_main_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎤 Boshlash", callback_data="vorstellen_start")],
+        [InlineKeyboardButton("📋 Qoidalar", callback_data="vorstellen_rules")],
+        [InlineKeyboardButton("📑 Shablonlar", callback_data="vorstellen_templates")],
+        [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_mentor_menu")],
+    ])
+
+
+async def vorstellen_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Vorstellen bo'limi — asosiy menyu"""
     query = update.callback_query
     await query.answer()
 
@@ -349,95 +369,157 @@ async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYP
     context.user_data["vs_history"] = []
     context.user_data["vs_round"] = 0
 
-    example = VORSTELLEN_EXAMPLES.get(level, VORSTELLEN_EXAMPLES["a1"])
-
     await query.edit_message_text(
         f"👤 *O'zini Tanishtirish — Vorstellen*\n\n"
         f"📊 Darajangiz: *{level.upper()}*\n\n"
-        f"Nemis tilida o'zingizni tanishtiring!\n\n"
-        f"💡 *Namuna ({level.upper()}):*\n_{esc_md(example)}_\n\n"
-        f"Endi o'zingiz yozing yoki gapirib yuboring 🎤",
+        f"Bu bo'limda siz nemis tilida o'zingizni tanishtirishni mashq qilasiz\\. "
+        f"AI sizning gaplaringizni tekshirib, maslahat beradi\\.\n\n"
+        f"Quyidagilardan birini tanlang\\:",
+        parse_mode="MarkdownV2",
+        reply_markup=_vorstellen_main_keyboard(),
+    )
+    return VORSTELLEN_START
+
+
+async def vorstellen_rules(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Vorstellen qoidalarini ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+
+    await query.edit_message_text(
+        VORSTELLEN_RULES_TEXT,
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
-            [InlineKeyboardButton("💡 Maslahat ko'rish", callback_data="vorstellen_hint")],
-            [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_mentor_menu")],
+            [InlineKeyboardButton("🎤 Boshlash", callback_data="vorstellen_start")],
+            [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
         ]),
     )
-    return VORSTELLEN_MENU
+    return VORSTELLEN_START
+
+
+async def vorstellen_templates(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Daraja bo'yicha shablonlar ro'yxati"""
+    query = update.callback_query
+    await query.answer()
+
+    buttons = [
+        [InlineKeyboardButton(level.upper(), callback_data=f"vorstellen_template_{level}")]
+        for level in VORSTELLEN_EXAMPLES.keys()
+    ]
+    buttons.append([InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")])
+
+    await query.edit_message_text(
+        "📑 *Shablonlar*\n\nQaysi daraja shabloni kerak\\?",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+    return VORSTELLEN_START
+
+
+async def vorstellen_template_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Tanlangan daraja uchun shablonni ko'rsatish"""
+    query = update.callback_query
+    await query.answer()
+
+    level = query.data.replace("vorstellen_template_", "")
+    example = VORSTELLEN_EXAMPLES.get(level, VORSTELLEN_EXAMPLES["a1"])
+
+    await query.edit_message_text(
+        f"📑 *Shablon \\({level.upper()}\\)*\n\n_{esc_md(example)}_",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📑 Boshqa shablon", callback_data="vorstellen_templates")],
+            [InlineKeyboardButton("🎤 Boshlash", callback_data="vorstellen_start")],
+            [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
+        ]),
+    )
+    return VORSTELLEN_START
+
+
+async def vorstellen_start_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Vorstellen mashqini boshlash"""
+    query = update.callback_query
+    if query:
+        await query.answer()
+
+    level = context.user_data.get("vs_level", "a1")
+    context.user_data["vs_history"] = []
+    context.user_data["vs_round"] = 0
+
+    example = VORSTELLEN_EXAMPLES.get(level, VORSTELLEN_EXAMPLES["a1"])
+    text = (
+        f"🎤 *Vorstellen mashqi*\n\n"
+        f"📊 Darajangiz\\: *{level.upper()}*\n\n"
+        f"Nemis tilida o'zingizni tanishtiring\\!\n\n"
+        f"💡 *Namuna \\({level.upper()}\\)\\:*\n_{esc_md(example)}_\n\n"
+        f"Endi o'zingiz yozing yoki gapirib yuboring 🎤"
+    )
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_skip_0")],
+        [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
+    ])
+
+    if query:
+        await query.edit_message_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+    else:
+        await update.message.reply_text(text, parse_mode="MarkdownV2", reply_markup=keyboard)
+
+    return VORSTELLEN_START
 
 
 async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Vorstellen jarayonini boshqarish"""
+    """Vorstellen jarayonini boshqarish (matn/ovoz va boshqaruv tugmalari)"""
 
-    # Callback tugmasi bosilgan bo'lsa
     if update.callback_query:
         query = update.callback_query
         await query.answer()
         data = query.data
 
-        if data == "vorstellen_hint":
-            level = context.user_data.get("vs_level", "a1")
-            example = VORSTELLEN_EXAMPLES.get(level, VORSTELLEN_EXAMPLES["a1"])
-            await query.answer(f"💡 Namuna: {example[:100]}", show_alert=True)
-            return VORSTELLEN_MENU
-
-        elif data == "vorstellen_new":
-            context.user_data["vs_history"] = []
-            context.user_data["vs_round"] = 0
-            return await vorstellen_start_new(update, context)
-
-        elif data == "vorstellen_deeper":
-            # Yangi savol berish
-            history = context.user_data.get("vs_history", [])
-            level = context.user_data.get("vs_level", "a1")
+        if data.startswith("vorstellen_skip_") or data.startswith("vorstellen_next_"):
             round_num = context.user_data.get("vs_round", 0) + 1
             context.user_data["vs_round"] = round_num
 
             if round_num > len(VORSTELLEN_TOPICS):
                 return await _vorstellen_final_result(query, context)
 
-            topic = VORSTELLEN_TOPICS[round_num - 1] if round_num <= len(VORSTELLEN_TOPICS) else "umumiy"
+            topic = VORSTELLEN_TOPICS[round_num - 1]
+            level = context.user_data.get("vs_level", "a1")
+            history = context.user_data.get("vs_history", [])
 
-            loading = await query.edit_message_text("⏳ *AI savol tayyorlamoqda...*", parse_mode="MarkdownV2")
+            await query.edit_message_text("⏳ *AI savol tayyorlamoqda\\.\\.\\.*", parse_mode="MarkdownV2")
 
             ai_question = await groq_chat([
                 {"role": "system", "content": (
                     f"Siz nemis tili o'qituvchisisiz. Talaba darajasi: {level.upper()}. "
                     f"Vorstellen mashqi uchun '{topic}' mavzusida nemis tilida bitta savol bering. "
-                    f"Savoldan keyin o'zbek tilidagi tarjimani qo'shing. "
-                    f"Qisqa va aniq savollar bering."
+                    f"Savoldan keyin o'zbek tilidagi tarjimani qo'shing. Qisqa va aniq savol bering."
                 )},
                 {"role": "user", "content": f"Suhbat tarixi: {json.dumps(history[-4:], ensure_ascii=False)}"},
             ])
 
             await query.edit_message_text(
-                f"🗣️ *Suhbat — {round_num}/{len(VORSTELLEN_TOPICS)} savol*\n\n"
-                f"🤖 *AI:* {esc_md(ai_question)}\n\n"
+                f"🗣️ *Savol — {round_num}/{len(VORSTELLEN_TOPICS)}*\n\n"
+                f"🤖 *AI\\:* {esc_md(ai_question)}\n\n"
                 f"Javob yozing yoki gapirib yuboring 🎤",
                 parse_mode="MarkdownV2",
                 reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data="vorstellen_skip")],
+                    [InlineKeyboardButton("⏭️ O'tkazib yuborish", callback_data=f"vorstellen_skip_{round_num}")],
                     [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
                 ]),
             )
-            return VORSTELLEN_FOLLOWUP
-
-        elif data == "vorstellen_skip":
-            context.user_data["vs_round"] = context.user_data.get("vs_round", 0) + 1
-            return await _vorstellen_final_result(query, context)
+            return VORSTELLEN_START
 
         elif data == "vorstellen_finish":
             return await _vorstellen_final_result(query, context)
 
-        return VORSTELLEN_MENU
+        return VORSTELLEN_START
 
-    # Matn yoki ovoz xabari
     elif update.message:
         text = update.message.text.strip() if update.message.text else ""
 
         if not text:
             await update.message.reply_text("❗ Iltimos matn yuboring yoki ovoz xabarini yuboring.")
-            return VORSTELLEN_MENU
+            return VORSTELLEN_START
 
         history = context.user_data.get("vs_history", [])
         level = context.user_data.get("vs_level", "a1")
@@ -446,9 +528,8 @@ async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_T
         history.append({"role": "user", "content": text})
         context.user_data["vs_history"] = history
 
-        loading = await update.message.reply_text("⏳ *AI tahlil qilmoqda...*", parse_mode="MarkdownV2")
+        loading = await update.message.reply_text("⏳ *AI tahlil qilmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
 
-        # AI javob
         ai_response = await groq_chat([
             {"role": "system", "content": (
                 f"Siz nemis tili o'qituvchisisiz. Talaba darajasi: {level.upper()}. "
@@ -468,22 +549,20 @@ async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_T
         except Exception:
             pass
 
+        next_round = round_num + 1
+        context.user_data["vs_round"] = next_round
+
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➡️ Davom etish", callback_data="vorstellen_deeper")],
-            [InlineKeyboardButton("🔄 Yangidan boshlash", callback_data="vorstellen_new")],
+            [InlineKeyboardButton("➡️ Keyingi savol", callback_data=f"vorstellen_next_{next_round}")],
             [InlineKeyboardButton("🏁 Yakunlash", callback_data="vorstellen_finish")],
         ])
 
-        if round_num == 0:
-            context.user_data["vs_round"] = 1
-
         await update.message.reply_text(
-            f"🤖 *AI Mentor:*\n\n{esc_md(ai_response)}",
+            f"🤖 *AI Mentor\\:*\n\n{esc_md(ai_response)}",
             parse_mode="MarkdownV2",
             reply_markup=keyboard,
         )
 
-        # XP berish
         try:
             from database import get_db
             db = get_db()
@@ -491,13 +570,13 @@ async def vorstellen_process_new(update: Update, context: ContextTypes.DEFAULT_T
         except Exception:
             pass
 
-        return VORSTELLEN_FOLLOWUP
+        return VORSTELLEN_START
 
-    return VORSTELLEN_MENU
+    return VORSTELLEN_START
 
 
 async def _vorstellen_final_result(query, context):
-    """Vorstellen yakuniy natija"""
+    """Vorstellen yakuniy natijasi"""
     history = context.user_data.get("vs_history", [])
     level = context.user_data.get("vs_level", "a1")
 
@@ -513,8 +592,9 @@ async def _vorstellen_final_result(query, context):
 
     user_texts = [m["content"] for m in history if m["role"] == "user"]
     combined = " ".join(user_texts)
+    context.user_data["vs_combined_text"] = combined
 
-    loading = await query.edit_message_text("⏳ *Yakuniy tahlil tayyorlanmoqda...*", parse_mode="MarkdownV2")
+    await query.edit_message_text("⏳ *Yakuniy tahlil tayyorlanmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
 
     final_eval = await groq_chat([
         {"role": "system", "content": (
@@ -528,8 +608,8 @@ async def _vorstellen_final_result(query, context):
         )},
         {"role": "user", "content": f"Talabaning yozganlari:\n{combined}"},
     ])
+    context.user_data["vs_final_eval"] = final_eval
 
-    # XP berish
     try:
         from database import get_db
         db = get_db()
@@ -543,8 +623,11 @@ async def _vorstellen_final_result(query, context):
         f"🎁 *\\+50 XP* qo'shildi\\!",
         parse_mode="MarkdownV2",
         reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("📄 Bo'limlarni ko'rish", callback_data="vs_show_full")],
+            [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
+            [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
+            [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
             [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
-            [InlineKeyboardButton("🤖 AI Mentor", callback_data="ai_mentor_menu")],
             [InlineKeyboardButton("🏠 Asosiy menu", callback_data="main_menu")],
         ]),
     )
@@ -552,17 +635,127 @@ async def _vorstellen_final_result(query, context):
 
 
 async def vs_show_section_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Natija bo'limlarini ko'rsatish"""
     query = update.callback_query
     await query.answer()
+
     section = query.data.replace("vs_show_", "")
-    await query.answer(f"📄 {section} ko'rsatilmoqda", show_alert=True)
+
+    if section == "yaxshilash":
+        final_eval = context.user_data.get("vs_final_eval", "")
+        await query.edit_message_text(
+            f"🎉 *Vorstellen natijasi*\n\n{esc_md(final_eval)}",
+            parse_mode="MarkdownV2",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("📄 Bo'limlarni ko'rish", callback_data="vs_show_full")],
+                [InlineKeyboardButton("✨ Yaxshilash", callback_data="vs_show_yaxshilash")],
+                [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
+                [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
+                [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
+            ]),
+        )
+        return VORSTELLEN_RESULT
+
+    final_eval = context.user_data.get("vs_final_eval", "Natija topilmadi.")
+    await query.edit_message_text(
+        f"📄 *To'liq natija*\n\n{esc_md(final_eval)}",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 Orqaga", callback_data="vs_show_yaxshilash")],
+        ]),
+    )
     return VORSTELLEN_RESULT
+
+
+async def vs_improve_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Yaxshilash uchun daraja tanlash menyusi"""
+    query = update.callback_query
+    await query.answer()
+
+    buttons = [
+        [InlineKeyboardButton(level.upper(), callback_data=f"vorstellen_level_{level}")]
+        for level in VORSTELLEN_EXAMPLES.keys()
+    ]
+    buttons.append([InlineKeyboardButton("🔙 Orqaga", callback_data="vs_show_yaxshilash")])
+
+    await query.edit_message_text(
+        "✨ *Yaxshilangan variant*\n\nQaysi daraja darajasida yaxshilangan matn kerak\\?",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+    return VORSTELLEN_IMPROVE
+
+
+async def vs_improve_show(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Tanlangan daraja uchun yaxshilangan matnni AI orqali tuzish"""
+    query = update.callback_query
+    await query.answer()
+
+    level = query.data.replace("vorstellen_level_", "")
+    combined = context.user_data.get("vs_combined_text", "")
+
+    if not combined:
+        await query.edit_message_text(
+            "⚠️ Avval Vorstellen mashqini bajaring.",
+            reply_markup=InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Orqaga", callback_data="ai_vorstellen")],
+            ]),
+        )
+        return VORSTELLEN_RESULT
+
+    await query.edit_message_text("⏳ *Yaxshilangan variant tayyorlanmoqda\\.\\.\\.*", parse_mode="MarkdownV2")
+
+    improved = await groq_chat([
+        {"role": "system", "content": (
+            f"Siz nemis tili o'qituvchisisiz. Quyidagi talaba matnini {level.upper()} darajasiga mos "
+            f"to'g'ri va tabiiy nemis tiliga qayta yozing. Faqat yaxshilangan nemis matnini bering, "
+            f"so'ngra qisqa o'zbekcha izoh qo'shing."
+        )},
+        {"role": "user", "content": combined},
+    ])
+
+    await query.edit_message_text(
+        f"✨ *Yaxshilangan variant \\({level.upper()}\\)*\n\n{esc_md(improved)}",
+        parse_mode="MarkdownV2",
+        reply_markup=InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔊 Eshitish", callback_data="vs_speak")],
+            [InlineKeyboardButton("📑 PDF (tez kunda)", callback_data="vorstellen_pdf")],
+            [InlineKeyboardButton("🔙 Boshqa daraja", callback_data="vs_show_yaxshilash")],
+            [InlineKeyboardButton("🔄 Yana mashq qilish", callback_data="ai_vorstellen")],
+        ]),
+    )
+    return VORSTELLEN_IMPROVE
 
 
 async def vs_speak_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Natijani ovozli o'qish (Edge TTS orqali)"""
     query = update.callback_query
-    await query.answer("🔊 Ovoz funksiyasi", show_alert=True)
+    await query.answer()
+
+    text = context.user_data.get("vs_final_eval") or context.user_data.get("vs_combined_text") or ""
+    if not text:
+        await query.answer("⚠️ O'qish uchun matn topilmadi.", show_alert=True)
+        return VORSTELLEN_RESULT
+
+    try:
+        from voice_engine import speak_text
+        await speak_text(update, text[:500])
+    except Exception as e:
+        logger.error(f"vs_speak_new xato: {e}")
+        await query.answer("🔊 Ovoz funksiyasi hozircha ishlamadi.", show_alert=True)
+
+    return context.user_data.get("vs_last_state", VORSTELLEN_RESULT)
+
+
+async def vorstellen_pdf_new(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """PDF eksport — hozircha vaqtincha to'xtatilgan, keyinroq rivojlantiriladi"""
+    query = update.callback_query
+    await query.answer(
+        "📑 PDF eksport funksiyasi hali tayyor emas — tez kunda qo'shiladi!",
+        show_alert=True,
+    )
     return VORSTELLEN_RESULT
+
 
 
 # ==================== ERFAHRUNGEN (TAJRIBA SUHBATI) ====================
